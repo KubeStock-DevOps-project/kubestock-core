@@ -13,9 +13,11 @@ const AuthLayout = () => {
       <div className="relative z-10 w-full max-w-md animate-slide-up">
         <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
           {/* Header */}
-          <div className="bg-gradient-orange p-6 text-white text-center">
-            <h1 className="text-3xl font-bold font-poppins">IMS</h1>
-            <p className="text-sm opacity-90 mt-1">
+          <div className="bg-white p-6 text-center border-b-2 border-dark-100">
+            <h1 className="text-3xl font-bold font-poppins text-primary">
+              IMS
+            </h1>
+            <p className="text-sm text-dark-600 mt-1">
               Inventory Management System
             </p>
           </div>
