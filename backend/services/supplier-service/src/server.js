@@ -2,26 +2,24 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
-const winston = require("winston");
+const db = require("./config/database");
+const logger = require("./config/logger");
+const supplierRoutes = require("./routes/supplier.routes");
+const purchaseOrderRoutes = require("./routes/purchaseOrder.routes");
+const {
+  errorHandler,
+  notFoundHandler,
+} = require("./middlewares/errorHandler.middleware");
 
 const app = express();
 const PORT = process.env.PORT || 3004;
 
-const logger = winston.createLogger({
-  level: "info",
-  format: winston.format.json(),
-  defaultMeta: { service: "supplier-service" },
-  transports: [
-    new winston.transports.File({ filename: "logs/error.log", level: "error" }),
-    new winston.transports.File({ filename: "logs/combined.log" }),
-    new winston.transports.Console({ format: winston.format.simple() }),
-  ],
-});
-
+// Middleware
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
 
+// Health check
 app.get("/health", (req, res) => {
   res.status(200).json({
     success: true,
@@ -31,22 +29,13 @@ app.get("/health", (req, res) => {
   });
 });
 
-// Placeholder routes - implement full functionality as shown in other services
-app.get("/api/suppliers", (req, res) => {
-  res.json({
-    success: true,
-    message: "Supplier service operational",
-    data: [],
-  });
-});
+// API Routes
+app.use("/api/suppliers", supplierRoutes);
+app.use("/api/purchase-orders", purchaseOrderRoutes);
 
-app.get("/api/purchase-orders", (req, res) => {
-  res.json({
-    success: true,
-    message: "Purchase order service operational",
-    data: [],
-  });
-});
+// Error handling
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 app.use((req, res) => {
   res.status(404).json({ success: false, message: "Route not found" });
