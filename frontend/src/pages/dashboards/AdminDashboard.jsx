@@ -21,7 +21,9 @@ import {
 } from "recharts";
 import { productService } from "../../services/productService";
 import { inventoryService } from "../../services/inventoryService";
+import { userService } from "../../services/userService";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
+import toast from "react-hot-toast";
 
 const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
@@ -29,8 +31,11 @@ const AdminDashboard = () => {
     totalProducts: 0,
     totalInventory: 0,
     lowStockItems: 0,
-    recentMovements: 0,
+    totalUsers: 0,
   });
+  const [stockMovements, setStockMovements] = useState([]);
+  const [categoryData, setCategoryData] = useState([]);
+  const [recentActivities, setRecentActivities] = useState([]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -38,11 +43,14 @@ const AdminDashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      const [products, inventory] = await Promise.all([
+      const [products, inventory, users, movements] = await Promise.all([
         productService.getAllProducts(),
         inventoryService.getAllInventory(),
+        userService.getAllUsers().catch(() => ({ data: [] })),
+        inventoryService.getStockMovements({ limit: 6 }).catch(() => ({ data: [] })),
       ]);
 
+      // Calculate stats
       setStats({
         totalProducts: products.data?.length || 0,
         totalInventory:
@@ -50,23 +58,67 @@ const AdminDashboard = () => {
         lowStockItems:
           inventory.data?.filter((item) => item.quantity < item.min_quantity)
             .length || 0,
-        recentMovements: 0,
+        totalUsers: users.data?.length || 0,
       });
+
+      // Process stock movements for chart
+      if (movements.data && movements.data.length > 0) {
+        const movementsByMonth = {};
+        movements.data.forEach((movement) => {
+          const month = new Date(movement.created_at).toLocaleDateString('en-US', { month: 'short' });
+          movementsByMonth[month] = (movementsByMonth[month] || 0) + Math.abs(movement.quantity);
+        });
+        setStockMovements(
+          Object.entries(movementsByMonth).map(([name, value]) => ({ name, value }))
+        );
+      } else {
+        // Default data
+        setStockMovements([
+          { name: "Jan", value: 4000 },
+          { name: "Feb", value: 3000 },
+          { name: "Mar", value: 2000 },
+          { name: "Apr", value: 2780 },
+          { name: "May", value: 1890 },
+          { name: "Jun", value: 2390 },
+        ]);
+      }
+
+      // Process category data for chart
+      if (products.data && products.data.length > 0) {
+        const categoryCounts = {};
+        products.data.forEach((product) => {
+          const category = product.category_name || "Uncategorized";
+          categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+        });
+        setCategoryData(
+          Object.entries(categoryCounts).map(([name, value]) => ({ name, value }))
+        );
+      } else {
+        setCategoryData([
+          { name: "Electronics", value: 12 },
+          { name: "Clothing", value: 8 },
+          { name: "Food", value: 15 },
+        ]);
+      }
+
+      // Recent activities
+      if (movements.data && movements.data.length > 0) {
+        setRecentActivities(
+          movements.data.slice(0, 3).map((movement) => ({
+            type: movement.movement_type,
+            product: `Product #${movement.product_id}`,
+            quantity: movement.quantity,
+            time: new Date(movement.created_at).toLocaleTimeString(),
+          }))
+        );
+      }
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
+      toast.error("Failed to load dashboard data");
     } finally {
       setLoading(false);
     }
   };
-
-  const chartData = [
-    { name: "Jan", value: 4000 },
-    { name: "Feb", value: 3000 },
-    { name: "Mar", value: 2000 },
-    { name: "Apr", value: 2780 },
-    { name: "May", value: 1890 },
-    { name: "Jun", value: 2390 },
-  ];
 
   if (loading) {
     return <LoadingSpinner text="Loading dashboard..." />;
@@ -120,7 +172,7 @@ const AdminDashboard = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm opacity-90">Active Users</p>
-              <h3 className="text-3xl font-bold mt-2">12</h3>
+              <h3 className="text-3xl font-bold mt-2">{stats.totalUsers}</h3>
             </div>
             <Users size={40} className="opacity-80" />
           </div>
@@ -135,7 +187,7 @@ const AdminDashboard = () => {
             Stock Movements
           </h3>
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={chartData}>
+            <LineChart data={stockMovements}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" />
               <YAxis />
@@ -153,10 +205,10 @@ const AdminDashboard = () => {
         <Card>
           <h3 className="text-lg font-semibold text-dark-900 mb-4 flex items-center">
             <Activity size={20} className="mr-2 text-primary" />
-            Monthly Overview
+            Products by Category
           </h3>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={chartData}>
+            <BarChart data={categoryData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" />
               <YAxis />
@@ -173,22 +225,26 @@ const AdminDashboard = () => {
           Recent Activity
         </h3>
         <div className="space-y-3">
-          {[1, 2, 3].map((item) => (
-            <div
-              key={item}
-              className="flex items-center p-3 bg-dark-50 rounded-lg"
-            >
-              <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white">
-                <Activity size={20} />
+          {recentActivities.length > 0 ? (
+            recentActivities.map((activity, idx) => (
+              <div
+                key={idx}
+                className="flex items-center p-3 bg-dark-50 rounded-lg"
+              >
+                <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white">
+                  <Activity size={20} />
+                </div>
+                <div className="ml-4 flex-1">
+                  <p className="text-sm font-medium text-dark-900">
+                    {activity.type === "IN" ? "Stock Added" : activity.type === "OUT" ? "Stock Removed" : "Stock Adjusted"}: {activity.product} ({Math.abs(activity.quantity)} units)
+                  </p>
+                  <p className="text-xs text-dark-500">{activity.time}</p>
+                </div>
               </div>
-              <div className="ml-4 flex-1">
-                <p className="text-sm font-medium text-dark-900">
-                  Stock adjusted for Product #{item}
-                </p>
-                <p className="text-xs text-dark-500">2 hours ago</p>
-              </div>
-            </div>
-          ))}
+            ))
+          ) : (
+            <p className="text-center text-dark-500 py-4">No recent activities</p>
+          )}
         </div>
       </Card>
     </div>

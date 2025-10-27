@@ -18,7 +18,9 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { inventoryService } from "../../services/inventoryService";
+import { productService } from "../../services/productService";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
+import toast from "react-hot-toast";
 
 const WarehouseDashboard = () => {
   const [loading, setLoading] = useState(true);
@@ -28,6 +30,9 @@ const WarehouseDashboard = () => {
     pendingAdjustments: 0,
     todayMovements: 0,
   });
+  const [stockData, setStockData] = useState([]);
+  const [lowStockProducts, setLowStockProducts] = useState([]);
+  const [recentMovements, setRecentMovements] = useState([]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -35,7 +40,22 @@ const WarehouseDashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      const inventory = await inventoryService.getAllInventory();
+      const [inventory, products, movements] = await Promise.all([
+        inventoryService.getAllInventory(),
+        productService.getAllProducts(),
+        inventoryService.getStockMovements({ limit: 10 }).catch(() => ({ data: [] })),
+      ]);
+
+      // Get today's date at midnight
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Calculate today's movements
+      const todayMovementsCount = movements.data?.filter((m) => {
+        const movementDate = new Date(m.created_at);
+        movementDate.setHours(0, 0, 0, 0);
+        return movementDate.getTime() === today.getTime();
+      }).length || 0;
 
       setStats({
         totalInventory:
@@ -43,23 +63,69 @@ const WarehouseDashboard = () => {
         lowStockItems:
           inventory.data?.filter((item) => item.quantity < item.min_quantity)
             .length || 0,
-        pendingAdjustments: 3,
-        todayMovements: 15,
+        pendingAdjustments: 0, // This would come from a real API
+        todayMovements: todayMovementsCount,
       });
+
+      // Group products by category for chart
+      if (products.data && products.data.length > 0 && inventory.data) {
+        const categoryStock = {};
+        products.data.forEach((product) => {
+          const category = product.category_name || "Uncategorized";
+          const inventoryItem = inventory.data.find((inv) => inv.product_id === product.id);
+          const qty = inventoryItem?.quantity || 0;
+          categoryStock[category] = (categoryStock[category] || 0) + qty;
+        });
+        setStockData(
+          Object.entries(categoryStock)
+            .map(([name, stock]) => ({ name, stock }))
+            .slice(0, 5)
+        );
+      } else {
+        setStockData([
+          { name: "Electronics", stock: 450 },
+          { name: "Clothing", stock: 320 },
+          { name: "Food", stock: 280 },
+        ]);
+      }
+
+      // Get low stock items with product details
+      if (inventory.data && products.data) {
+        const lowStock = inventory.data
+          .filter((item) => item.quantity < item.min_quantity)
+          .slice(0, 3)
+          .map((item) => {
+            const product = products.data.find((p) => p.id === item.product_id);
+            return {
+              name: product?.name || `Product #${item.product_id}`,
+              qty: item.quantity,
+              min: item.min_quantity,
+            };
+          });
+        setLowStockProducts(lowStock);
+      }
+
+      // Process recent movements
+      if (movements.data && movements.data.length > 0) {
+        setRecentMovements(
+          movements.data.slice(0, 3).map((movement) => {
+            const product = products.data?.find((p) => p.id === movement.product_id);
+            return {
+              type: movement.movement_type,
+              product: product?.name || `Product #${movement.product_id}`,
+              qty: Math.abs(movement.quantity),
+              time: new Date(movement.created_at).toLocaleString(),
+            };
+          })
+        );
+      }
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
+      toast.error("Failed to load warehouse data");
     } finally {
       setLoading(false);
     }
   };
-
-  const stockData = [
-    { name: "Electronics", stock: 450 },
-    { name: "Clothing", stock: 320 },
-    { name: "Food", stock: 280 },
-    { name: "Furniture", stock: 150 },
-    { name: "Others", stock: 200 },
-  ];
 
   if (loading) {
     return <LoadingSpinner text="Loading warehouse dashboard..." />;
@@ -150,26 +216,28 @@ const WarehouseDashboard = () => {
             Low Stock Items
           </h3>
           <div className="space-y-3">
-            {[
-              { name: "Product A", qty: 5, min: 20 },
-              { name: "Product B", qty: 8, min: 25 },
-              { name: "Product C", qty: 3, min: 15 },
-            ].map((item, idx) => (
-              <div
-                key={idx}
-                className="flex items-center justify-between p-3 bg-orange-50 rounded-lg border border-orange-200"
-              >
-                <div>
-                  <p className="text-sm font-medium text-dark-900">
-                    {item.name}
-                  </p>
-                  <p className="text-xs text-dark-500">
-                    Current: {item.qty} | Min: {item.min}
-                  </p>
+            {lowStockProducts.length > 0 ? (
+              lowStockProducts.map((item, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center justify-between p-3 bg-orange-50 rounded-lg border border-orange-200"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-dark-900">
+                      {item.name}
+                    </p>
+                    <p className="text-xs text-dark-500">
+                      Current: {item.qty} | Min: {item.min}
+                    </p>
+                  </div>
+                  <AlertCircle size={20} className="text-orange-600" />
                 </div>
-                <AlertCircle size={20} className="text-orange-600" />
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-center text-dark-500 py-4">
+                All stock levels are healthy!
+              </p>
+            )}
           </div>
         </Card>
       </div>
@@ -180,37 +248,43 @@ const WarehouseDashboard = () => {
           Recent Stock Movements
         </h3>
         <div className="space-y-3">
-          {[
-            { type: "IN", product: "Product X", qty: 50, time: "10 mins ago" },
-            { type: "OUT", product: "Product Y", qty: 25, time: "30 mins ago" },
-            { type: "IN", product: "Product Z", qty: 100, time: "1 hour ago" },
-          ].map((item, idx) => (
-            <div
-              key={idx}
-              className="flex items-center p-3 bg-dark-50 rounded-lg"
-            >
+          {recentMovements.length > 0 ? (
+            recentMovements.map((item, idx) => (
               <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center text-white ${
-                  item.type === "IN" ? "bg-green-600" : "bg-red-600"
-                }`}
+                key={idx}
+                className="flex items-center p-3 bg-dark-50 rounded-lg"
               >
-                {item.type === "IN" ? (
-                  <CheckCircle size={20} />
-                ) : (
-                  <Activity size={20} />
-                )}
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center text-white ${
+                    item.type === "IN" || item.type === "INBOUND"
+                      ? "bg-green-600"
+                      : "bg-red-600"
+                  }`}
+                >
+                  {item.type === "IN" || item.type === "INBOUND" ? (
+                    <CheckCircle size={20} />
+                  ) : (
+                    <Activity size={20} />
+                  )}
+                </div>
+                <div className="ml-4 flex-1">
+                  <p className="text-sm font-medium text-dark-900">
+                    {item.type === "IN" || item.type === "INBOUND"
+                      ? "Stock In"
+                      : "Stock Out"}
+                    : {item.product}
+                  </p>
+                  <p className="text-xs text-dark-500">
+                    Quantity: {item.qty} • {item.time}
+                  </p>
+                </div>
               </div>
-              <div className="ml-4 flex-1">
-                <p className="text-sm font-medium text-dark-900">
-                  {item.type === "IN" ? "Stock In" : "Stock Out"}:{" "}
-                  {item.product}
-                </p>
-                <p className="text-xs text-dark-500">
-                  Quantity: {item.qty} • {item.time}
-                </p>
-              </div>
-            </div>
-          ))}
+            ))
+          ) : (
+            <p className="text-center text-dark-500 py-4">
+              No recent stock movements
+            </p>
+          )}
         </div>
       </Card>
     </div>

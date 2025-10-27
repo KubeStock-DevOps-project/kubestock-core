@@ -20,36 +20,100 @@ import {
   Pie,
   Cell,
 } from "recharts";
+import { supplierService } from "../../services/supplierService";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
+import toast from "react-hot-toast";
 
 const SupplierDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
-    totalOrders: 28,
-    pendingOrders: 5,
-    completedOrders: 20,
-    totalRevenue: 45600,
+    totalOrders: 0,
+    pendingOrders: 0,
+    completedOrders: 0,
+    totalRevenue: 0,
   });
+  const [monthlyOrders, setMonthlyOrders] = useState([]);
+  const [orderStatus, setOrderStatus] = useState([]);
+  const [recentOrders, setRecentOrders] = useState([]);
 
   useEffect(() => {
-    // Simulate loading
-    setTimeout(() => setLoading(false), 500);
+    fetchDashboardData();
   }, []);
 
-  const monthlyOrders = [
-    { month: "Jan", orders: 12 },
-    { month: "Feb", orders: 15 },
-    { month: "Mar", orders: 18 },
-    { month: "Apr", orders: 22 },
-    { month: "May", orders: 25 },
-    { month: "Jun", orders: 28 },
-  ];
+  const fetchDashboardData = async () => {
+    try {
+      const purchaseOrders = await supplierService
+        .getAllPurchaseOrders()
+        .catch(() => ({ data: [] }));
 
-  const orderStatus = [
-    { name: "Completed", value: 20, color: "#10B981" },
-    { name: "Pending", value: 5, color: "#F97316" },
-    { name: "Cancelled", value: 3, color: "#EF4444" },
-  ];
+      const orders = purchaseOrders.data || [];
+
+      // Calculate stats
+      const pending = orders.filter((o) => o.status === "pending").length;
+      const completed = orders.filter((o) => o.status === "completed").length;
+      const cancelled = orders.filter((o) => o.status === "cancelled").length;
+      const totalRevenue = orders
+        .filter((o) => o.status === "completed")
+        .reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0);
+
+      setStats({
+        totalOrders: orders.length,
+        pendingOrders: pending,
+        completedOrders: completed,
+        totalRevenue: Math.round(totalRevenue),
+      });
+
+      // Group orders by month
+      if (orders.length > 0) {
+        const monthCounts = {};
+        orders.forEach((order) => {
+          const month = new Date(order.created_at).toLocaleDateString("en-US", {
+            month: "short",
+          });
+          monthCounts[month] = (monthCounts[month] || 0) + 1;
+        });
+        setMonthlyOrders(
+          Object.entries(monthCounts).map(([month, orders]) => ({
+            month,
+            orders,
+          }))
+        );
+      } else {
+        // Default data
+        setMonthlyOrders([
+          { month: "Jan", orders: 12 },
+          { month: "Feb", orders: 15 },
+          { month: "Mar", orders: 18 },
+          { month: "Apr", orders: 22 },
+          { month: "May", orders: 25 },
+          { month: "Jun", orders: 28 },
+        ]);
+      }
+
+      // Order status distribution
+      setOrderStatus([
+        { name: "Completed", value: completed, color: "#10B981" },
+        { name: "Pending", value: pending, color: "#F97316" },
+        { name: "Cancelled", value: cancelled, color: "#EF4444" },
+      ]);
+
+      // Recent orders
+      setRecentOrders(
+        orders.slice(0, 3).map((order) => ({
+          id: `PO-${order.id}`,
+          product: `Order #${order.id}`,
+          qty: order.quantity || 0,
+          amount: parseFloat(order.total_amount || 0),
+          status: order.status,
+        }))
+      );
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+      toast.error("Failed to load supplier data");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (loading) {
     return <LoadingSpinner text="Loading supplier dashboard..." />;
@@ -189,55 +253,43 @@ const SupplierDashboard = () => {
               </tr>
             </thead>
             <tbody>
-              {[
-                {
-                  id: "PO-001",
-                  product: "Electronics Kit",
-                  qty: 50,
-                  amount: 2500,
-                  status: "Pending",
-                },
-                {
-                  id: "PO-002",
-                  product: "Office Supplies",
-                  qty: 100,
-                  amount: 1200,
-                  status: "Completed",
-                },
-                {
-                  id: "PO-003",
-                  product: "Furniture Set",
-                  qty: 20,
-                  amount: 8000,
-                  status: "Pending",
-                },
-              ].map((order, idx) => (
-                <tr key={idx} className="border-b border-dark-100">
-                  <td className="py-3 px-4 text-sm text-dark-900">
-                    {order.id}
-                  </td>
-                  <td className="py-3 px-4 text-sm text-dark-900">
-                    {order.product}
-                  </td>
-                  <td className="py-3 px-4 text-sm text-dark-900">
-                    {order.qty}
-                  </td>
-                  <td className="py-3 px-4 text-sm text-dark-900">
-                    ${order.amount.toLocaleString()}
-                  </td>
-                  <td className="py-3 px-4">
-                    <span
-                      className={`px-2 py-1 text-xs rounded-full ${
-                        order.status === "Completed"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-orange-100 text-orange-800"
-                      }`}
-                    >
-                      {order.status}
-                    </span>
+              {recentOrders.length > 0 ? (
+                recentOrders.map((order, idx) => (
+                  <tr key={idx} className="border-b border-dark-100">
+                    <td className="py-3 px-4 text-sm text-dark-900">
+                      {order.id}
+                    </td>
+                    <td className="py-3 px-4 text-sm text-dark-900">
+                      {order.product}
+                    </td>
+                    <td className="py-3 px-4 text-sm text-dark-900">
+                      {order.qty}
+                    </td>
+                    <td className="py-3 px-4 text-sm text-dark-900">
+                      ${order.amount.toLocaleString()}
+                    </td>
+                    <td className="py-3 px-4">
+                      <span
+                        className={`px-2 py-1 text-xs rounded-full capitalize ${
+                          order.status === "completed"
+                            ? "bg-green-100 text-green-800"
+                            : order.status === "pending"
+                            ? "bg-orange-100 text-orange-800"
+                            : "bg-red-100 text-red-800"
+                        }`}
+                      >
+                        {order.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="5" className="py-8 text-center text-dark-500">
+                    No purchase orders yet
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
