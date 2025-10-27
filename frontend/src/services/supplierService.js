@@ -46,7 +46,9 @@ export const supplierService = {
   },
 
   deleteSupplier: async (id) => {
-    const response = await supplierApi.delete(`${API_ENDPOINTS.SUPPLIERS}/${id}`);
+    const response = await supplierApi.delete(
+      `${API_ENDPOINTS.SUPPLIERS}/${id}`
+    );
     return response.data;
   },
 

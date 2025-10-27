@@ -47,7 +47,9 @@ const AdminDashboard = () => {
         productService.getAllProducts(),
         inventoryService.getAllInventory(),
         userService.getAllUsers().catch(() => ({ data: [] })),
-        inventoryService.getStockMovements({ limit: 6 }).catch(() => ({ data: [] })),
+        inventoryService
+          .getStockMovements({ limit: 6 })
+          .catch(() => ({ data: [] })),
       ]);
 
       // Calculate stats
@@ -65,11 +67,18 @@ const AdminDashboard = () => {
       if (movements.data && movements.data.length > 0) {
         const movementsByMonth = {};
         movements.data.forEach((movement) => {
-          const month = new Date(movement.created_at).toLocaleDateString('en-US', { month: 'short' });
-          movementsByMonth[month] = (movementsByMonth[month] || 0) + Math.abs(movement.quantity);
+          const month = new Date(movement.created_at).toLocaleDateString(
+            "en-US",
+            { month: "short" }
+          );
+          movementsByMonth[month] =
+            (movementsByMonth[month] || 0) + Math.abs(movement.quantity);
         });
         setStockMovements(
-          Object.entries(movementsByMonth).map(([name, value]) => ({ name, value }))
+          Object.entries(movementsByMonth).map(([name, value]) => ({
+            name,
+            value,
+          }))
         );
       } else {
         // Default data
@@ -91,7 +100,10 @@ const AdminDashboard = () => {
           categoryCounts[category] = (categoryCounts[category] || 0) + 1;
         });
         setCategoryData(
-          Object.entries(categoryCounts).map(([name, value]) => ({ name, value }))
+          Object.entries(categoryCounts).map(([name, value]) => ({
+            name,
+            value,
+          }))
         );
       } else {
         setCategoryData([
@@ -236,14 +248,21 @@ const AdminDashboard = () => {
                 </div>
                 <div className="ml-4 flex-1">
                   <p className="text-sm font-medium text-dark-900">
-                    {activity.type === "IN" ? "Stock Added" : activity.type === "OUT" ? "Stock Removed" : "Stock Adjusted"}: {activity.product} ({Math.abs(activity.quantity)} units)
+                    {activity.type === "IN"
+                      ? "Stock Added"
+                      : activity.type === "OUT"
+                      ? "Stock Removed"
+                      : "Stock Adjusted"}
+                    : {activity.product} ({Math.abs(activity.quantity)} units)
                   </p>
                   <p className="text-xs text-dark-500">{activity.time}</p>
                 </div>
               </div>
             ))
           ) : (
-            <p className="text-center text-dark-500 py-4">No recent activities</p>
+            <p className="text-center text-dark-500 py-4">
+              No recent activities
+            </p>
           )}
         </div>
       </Card>

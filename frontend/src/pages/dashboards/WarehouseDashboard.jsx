@@ -43,7 +43,9 @@ const WarehouseDashboard = () => {
       const [inventory, products, movements] = await Promise.all([
         inventoryService.getAllInventory(),
         productService.getAllProducts(),
-        inventoryService.getStockMovements({ limit: 10 }).catch(() => ({ data: [] })),
+        inventoryService
+          .getStockMovements({ limit: 10 })
+          .catch(() => ({ data: [] })),
       ]);
 
       // Get today's date at midnight
@@ -51,11 +53,12 @@ const WarehouseDashboard = () => {
       today.setHours(0, 0, 0, 0);
 
       // Calculate today's movements
-      const todayMovementsCount = movements.data?.filter((m) => {
-        const movementDate = new Date(m.created_at);
-        movementDate.setHours(0, 0, 0, 0);
-        return movementDate.getTime() === today.getTime();
-      }).length || 0;
+      const todayMovementsCount =
+        movements.data?.filter((m) => {
+          const movementDate = new Date(m.created_at);
+          movementDate.setHours(0, 0, 0, 0);
+          return movementDate.getTime() === today.getTime();
+        }).length || 0;
 
       setStats({
         totalInventory:
@@ -72,7 +75,9 @@ const WarehouseDashboard = () => {
         const categoryStock = {};
         products.data.forEach((product) => {
           const category = product.category_name || "Uncategorized";
-          const inventoryItem = inventory.data.find((inv) => inv.product_id === product.id);
+          const inventoryItem = inventory.data.find(
+            (inv) => inv.product_id === product.id
+          );
           const qty = inventoryItem?.quantity || 0;
           categoryStock[category] = (categoryStock[category] || 0) + qty;
         });
@@ -109,7 +114,9 @@ const WarehouseDashboard = () => {
       if (movements.data && movements.data.length > 0) {
         setRecentMovements(
           movements.data.slice(0, 3).map((movement) => {
-            const product = products.data?.find((p) => p.id === movement.product_id);
+            const product = products.data?.find(
+              (p) => p.id === movement.product_id
+            );
             return {
               type: movement.movement_type,
               product: product?.name || `Product #${movement.product_id}`,
