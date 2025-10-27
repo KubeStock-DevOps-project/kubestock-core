@@ -32,6 +32,12 @@ export const AuthProvider = ({ children }) => {
   const login = async (credentials) => {
     try {
       const data = await authService.login(credentials);
+      
+      // Ensure user data exists
+      if (!data.user) {
+        throw new Error("Invalid response from server");
+      }
+      
       setUser(data.user);
       toast.success("Login successful!");
 
@@ -49,7 +55,7 @@ export const AuthProvider = ({ children }) => {
 
       return data;
     } catch (error) {
-      const message = error.response?.data?.error || "Login failed";
+      const message = error.response?.data?.message || error.message || "Login failed";
       toast.error(message);
       throw error;
     }
