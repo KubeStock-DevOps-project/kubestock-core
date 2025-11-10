@@ -18,7 +18,6 @@ const ProductAdd = () => {
     category_id: "",
     size: "",
     color: "",
-    is_active: true,
   });
 
   const handleChange = (e) => {
@@ -34,7 +33,26 @@ const ProductAdd = () => {
     setLoading(true);
 
     try {
-      await productService.createProduct(formData);
+      // Prepare data - remove empty strings and is_active for creation
+      const productData = {
+        name: formData.name,
+        sku: formData.sku,
+        unit_price: parseFloat(formData.unit_price),
+        description: formData.description || "",
+      };
+
+      // Add optional fields only if they have values
+      if (formData.category_id) {
+        productData.category_id = parseInt(formData.category_id);
+      }
+      if (formData.size) {
+        productData.size = formData.size;
+      }
+      if (formData.color) {
+        productData.color = formData.color;
+      }
+
+      await productService.createProduct(productData);
       toast.success("Product created successfully");
       navigate("/products");
     } catch (error) {
@@ -123,21 +141,6 @@ const ProductAdd = () => {
                 onChange={handleChange}
                 placeholder="Enter product description"
               />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  name="is_active"
-                  checked={formData.is_active}
-                  onChange={handleChange}
-                  className="rounded border-dark-300 text-primary focus:ring-primary"
-                />
-                <span className="ml-2 text-sm text-dark-700">
-                  Active Product
-                </span>
-              </label>
             </div>
           </div>
 

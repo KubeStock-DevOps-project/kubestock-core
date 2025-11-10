@@ -95,7 +95,7 @@ const ProductList = () => {
             </p>
             <div className="flex justify-between items-center mb-4">
               <span className="text-lg font-bold text-primary">
-                {formatCurrency(product.price)}
+                {formatCurrency(product.unit_price)}
               </span>
               <Badge variant={product.is_active ? "success" : "danger"}>
                 {product.is_active ? "Active" : "Inactive"}
