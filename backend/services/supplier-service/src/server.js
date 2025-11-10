@@ -4,6 +4,12 @@ const cors = require("cors");
 const helmet = require("helmet");
 const db = require("./config/database");
 const logger = require("./config/logger");
+const {
+  metricsMiddleware,
+  getMetrics,
+  getContentType,
+  updateDbMetrics,
+} = require("./middlewares/metrics");
 const supplierRoutes = require("./routes/supplier.routes");
 const purchaseOrderRoutes = require("./routes/purchaseOrder.routes");
 const {
@@ -14,10 +20,15 @@ const {
 const app = express();
 const PORT = process.env.PORT || 3004;
 
+setInterval(() => {
+  updateDbMetrics(db);
+}, 30000);
+
 // Middleware
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
+app.use(metricsMiddleware);
 
 // Health check
 app.get("/health", (req, res) => {
@@ -27,6 +38,17 @@ app.get("/health", (req, res) => {
     status: "healthy",
     timestamp: new Date().toISOString(),
   });
+});
+
+// Metrics endpoint
+app.get("/metrics", async (req, res) => {
+  try {
+    res.set("Content-Type", getContentType());
+    res.send(await getMetrics());
+  } catch (error) {
+    logger.error("Error generating metrics", error);
+    res.status(500).send("Error generating metrics");
+  }
 });
 
 // API Routes
@@ -41,8 +63,27 @@ app.use((req, res) => {
   res.status(404).json({ success: false, message: "Route not found" });
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   logger.info(`Supplier Service running on port ${PORT}`);
+  logger.info(`Metrics available at http://localhost:${PORT}/metrics`);
 });
+
+const gracefulShutdown = (signal) => {
+  logger.info(`${signal} received. Starting graceful shutdown...`);
+  server.close(() => {
+    logger.info("HTTP server closed");
+    db.end(() => {
+      logger.info("Database connections closed");
+      process.exit(0);
+    });
+  });
+  setTimeout(() => {
+    logger.error("Forced shutdown after timeout");
+    process.exit(1);
+  }, 30000);
+};
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 module.exports = app;

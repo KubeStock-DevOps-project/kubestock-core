@@ -4,15 +4,27 @@ const cors = require("cors");
 const helmet = require("helmet");
 const logger = require("./config/logger");
 const errorHandler = require("./middlewares/errorHandler.middleware");
+const {
+  metricsMiddleware,
+  getMetrics,
+  getContentType,
+  updateDbMetrics,
+} = require("./middlewares/metrics");
+const pool = require("./config/database");
 const orderRoutes = require("./routes/order.routes");
 
 const app = express();
 const PORT = process.env.PORT || 3005;
 
+setInterval(() => {
+  updateDbMetrics(pool);
+}, 30000);
+
 // Middleware
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
+app.use(metricsMiddleware);
 
 // Request logging
 app.use((req, res, next) => {
@@ -33,6 +45,17 @@ app.get("/health", (req, res) => {
   });
 });
 
+// Metrics endpoint
+app.get("/metrics", async (req, res) => {
+  try {
+    res.set("Content-Type", getContentType());
+    res.send(await getMetrics());
+  } catch (error) {
+    logger.error("Error generating metrics", error);
+    res.status(500).send("Error generating metrics");
+  }
+});
+
 // Routes
 app.use("/api/orders", orderRoutes);
 
@@ -49,9 +72,28 @@ app.use((req, res) => {
 app.use(errorHandler);
 
 // Start server
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   logger.info(`Order Service running on port ${PORT}`);
   logger.info(`Environment: ${process.env.NODE_ENV || "development"}`);
+  logger.info(`Metrics available at http://localhost:${PORT}/metrics`);
 });
+
+const gracefulShutdown = (signal) => {
+  logger.info(`${signal} received. Starting graceful shutdown...`);
+  server.close(() => {
+    logger.info("HTTP server closed");
+    pool.end(() => {
+      logger.info("Database connections closed");
+      process.exit(0);
+    });
+  });
+  setTimeout(() => {
+    logger.error("Forced shutdown after timeout");
+    process.exit(1);
+  }, 30000);
+};
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 module.exports = app;

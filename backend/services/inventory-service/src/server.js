@@ -4,15 +4,27 @@ const cors = require("cors");
 const helmet = require("helmet");
 const logger = require("./config/logger");
 const errorHandler = require("./middlewares/error.middleware");
+const {
+  metricsMiddleware,
+  getMetrics,
+  getContentType,
+  updateDbMetrics,
+} = require("./middlewares/metrics");
+const pool = require("./config/database");
 const inventoryRoutes = require("./routes/inventory.routes");
 
 const app = express();
 const PORT = process.env.PORT || 3003;
 
+setInterval(() => {
+  updateDbMetrics(pool);
+}, 30000);
+
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(metricsMiddleware);
 
 app.use((req, res, next) => {
   logger.info(`${req.method} ${req.path}`, {
@@ -31,6 +43,16 @@ app.get("/health", (req, res) => {
   });
 });
 
+app.get("/metrics", async (req, res) => {
+  try {
+    res.set("Content-Type", getContentType());
+    res.send(await getMetrics());
+  } catch (error) {
+    logger.error("Error generating metrics", error);
+    res.status(500).send("Error generating metrics");
+  }
+});
+
 app.use("/api/inventory", inventoryRoutes);
 
 app.use((req, res) => {
@@ -42,9 +64,28 @@ app.use((req, res) => {
 
 app.use(errorHandler);
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   logger.info(`Inventory Service running on port ${PORT}`);
   logger.info(`Environment: ${process.env.NODE_ENV}`);
+  logger.info(`Metrics available at http://localhost:${PORT}/metrics`);
 });
+
+const gracefulShutdown = (signal) => {
+  logger.info(`${signal} received. Starting graceful shutdown...`);
+  server.close(() => {
+    logger.info("HTTP server closed");
+    pool.end(() => {
+      logger.info("Database connections closed");
+      process.exit(0);
+    });
+  });
+  setTimeout(() => {
+    logger.error("Forced shutdown after timeout");
+    process.exit(1);
+  }, 30000);
+};
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 module.exports = app;
