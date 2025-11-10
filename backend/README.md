@@ -7,6 +7,7 @@ This is a production-ready microservices-based backend for an Inventory and Stoc
 - **PostgreSQL** (separate schemas for each service)
 - **Docker** & **Docker Compose**
 - **REST APIs** for inter-service communication
+- **Database Migrations** with node-pg-migrate
 
 ### Microservices
 
@@ -15,6 +16,37 @@ This is a production-ready microservices-based backend for an Inventory and Stoc
 3. **Inventory Service** (Port 3003) - Stock Tracking & Management
 4. **Supplier & Procurement Service** (Port 3004) - Supplier & Purchase Order Management
 5. **Order Management Service** (Port 3005) - Sales Order Processing
+
+## 📁 Project Structure
+
+```
+backend/
+├── database/              # Database initialization scripts
+├── migrations/            # Database migration files (node-pg-migrate)
+├── services/             # Microservices
+│   ├── user-service/
+│   ├── product-catalog-service/
+│   ├── inventory-service/
+│   ├── supplier-service/
+│   └── order-service/
+├── docs/                 # Documentation
+│   ├── api/             # API documentation
+│   ├── migration/       # Migration guides
+│   ├── DEVOPS_INTEGRATION.md
+│   ├── PRODUCTION_CHECKLIST.md
+│   └── PROJECT_SUMMARY.md
+├── scripts/             # Utility scripts
+│   ├── reset-passwords.js
+│   └── reset-passwords.sql
+├── tests/               # Test scripts
+│   ├── crud-tests.ps1
+│   └── test-crud.ps1
+├── docker-compose.yml   # Docker orchestration
+├── database.json        # Migration configuration
+├── package.json         # NPM scripts & dependencies
+├── README.md           # This file
+└── QUICKSTART.md       # Quick start guide
+```
 
 ## 📋 Prerequisites
 
@@ -380,41 +412,40 @@ jobs:
 - **Security**: Helmet, CORS, Rate Limiting
 - **HTTP Client**: Axios
 - **Containerization**: Docker, Docker Compose
-
-## 📁 Project Structure
-
-```
-backend/
-├── docker-compose.yml
-├── .env
-├── .env.example
-├── database/
-│   └── init.sql
-├── services/
-│   ├── user-service/
-│   │   ├── Dockerfile
-│   │   ├── package.json
-│   │   ├── .env.example
-│   │   └── src/
-│   │       ├── config/
-│   │       ├── controllers/
-│   │       ├── models/
-│   │       ├── routes/
-│   │       ├── middlewares/
-│   │       └── server.js
-│   ├── product-catalog-service/
-│   ├── inventory-service/
-│   ├── supplier-service/
-│   └── order-service/
-└── README.md
-```
+- **Migrations**: node-pg-migrate
 
 ## 🧪 Testing
 
 ```bash
+# Run test scripts
+cd tests
+.\crud-tests.ps1
+
+# Or run specific service tests
 cd services/user-service
 npm test
 ```
+
+For more testing information, see the [tests folder](tests/README.md).
+
+## 🗄️ Database Migrations
+
+This project uses **node-pg-migrate** for database schema version control.
+
+### Common Migration Commands
+
+```bash
+# Apply all pending migrations
+npm run migrate:up
+
+# Rollback last migration
+npm run migrate:down
+
+# Create new migration
+npm run migrate:create -- migration-name
+```
+
+**📖 Full Documentation**: See [Database Migration Guide](docs/migration/DATABASE_MIGRATION_GUIDE.md)
 
 ## 🔒 Security Best Practices
 
@@ -452,7 +483,25 @@ docker-compose restart user-service
 lsof -ti:3001 | xargs kill -9  # macOS/Linux
 ```
 
-## 📝 License
+## � Additional Documentation
+
+- **[Quick Start Guide](QUICKSTART.md)** - Fast setup for new developers
+- **[API Documentation](docs/api/)** - Detailed API endpoints and testing guides
+- **[Migration Guide](docs/migration/DATABASE_MIGRATION_GUIDE.md)** - Database schema management
+- **[DevOps Integration](docs/DEVOPS_INTEGRATION.md)** - Docker, CI/CD, deployment
+- **[Production Checklist](docs/PRODUCTION_CHECKLIST.md)** - Pre-deployment verification
+- **[Project Summary](docs/PROJECT_SUMMARY.md)** - Architecture and system overview
+
+## 🗂️ Folder Organization
+
+- **`/database`** - Database initialization and schema files
+- **`/migrations`** - Version-controlled database migrations
+- **`/services`** - All microservices source code
+- **`/docs`** - Comprehensive project documentation
+- **`/scripts`** - Utility scripts for maintenance and operations
+- **`/tests`** - Test scripts for CRUD and integration testing
+
+## �📝 License
 
 ISC
 
