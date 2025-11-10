@@ -41,7 +41,11 @@ const Table = ({
           key={colIndex}
           className="px-6 py-4 whitespace-nowrap text-sm text-dark-900"
         >
-          {col.render ? col.render(item) : item[col.accessor]}
+          {col.cell
+            ? col.cell(item)
+            : col.render
+            ? col.render(item)
+            : item[col.accessor]}
         </td>
       ))}
     </tr>
