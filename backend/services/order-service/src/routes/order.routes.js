@@ -1,14 +1,14 @@
 const express = require("express");
 const router = express.Router();
 const orderController = require("../controllers/order.controller");
-const {
-  validateCreateOrder,
-  validateUpdateOrder,
-  validateUpdateStatus,
-} = require("../middlewares/validation.middleware");
+// const {
+//   validateCreateOrder,
+//   validateUpdateOrder,
+//   validateUpdateStatus,
+// } = require("../middlewares/validation.middleware");
 
 // Create new order
-router.post("/", validateCreateOrder, orderController.createOrder);
+router.post("/", orderController.createOrder);
 
 // Get all orders
 router.get("/", orderController.getAllOrders);
@@ -20,12 +20,11 @@ router.get("/stats", orderController.getOrderStats);
 router.get("/:id", orderController.getOrderById);
 
 // Update order
-router.put("/:id", validateUpdateOrder, orderController.updateOrder);
+router.put("/:id", orderController.updateOrder);
 
 // Update order status
 router.patch(
   "/:id/status",
-  validateUpdateStatus,
   orderController.updateOrderStatus
 );
 

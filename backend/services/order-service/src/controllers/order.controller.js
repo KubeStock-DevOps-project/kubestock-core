@@ -1,23 +1,11 @@
 const Order = require("../models/order.model");
 const OrderItem = require("../models/orderItem.model");
 const logger = require("../config/logger");
-const { validationResult } = require("express-validator");
 
 class OrderController {
   // Create new order with items
   async createOrder(req, res) {
     try {
-      // Validation
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        logger.warn("Order creation validation failed:", errors.array());
-        return res.status(400).json({
-          success: false,
-          message: "Validation failed",
-          errors: errors.array(),
-        });
-      }
-
       const {
         user_id,
         customer_name,
@@ -148,17 +136,6 @@ class OrderController {
   async updateOrder(req, res) {
     try {
       const { id } = req.params;
-      const errors = validationResult(req);
-
-      if (!errors.isEmpty()) {
-        logger.warn(`Order ${id} update validation failed:`, errors.array());
-        return res.status(400).json({
-          success: false,
-          message: "Validation failed",
-          errors: errors.array(),
-        });
-      }
-
       const updates = req.body;
       const order = await Order.update(id, updates);
 
