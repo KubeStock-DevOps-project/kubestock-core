@@ -124,19 +124,18 @@ const ProductLifecycleManagement = () => {
       active: ["discontinue"],
       discontinued: ["activate", "archive"],
     };
-    
+
     const actions = allActions[state] || [];
-    
+
     // Filter actions based on role
     // Warehouse staff can only submit for approval and discontinue
     // Only admins can approve and activate
     if (!isAdmin) {
-      return actions.filter(action => 
-        action === "submit-for-approval" || 
-        action === "discontinue"
+      return actions.filter(
+        (action) => action === "submit-for-approval" || action === "discontinue"
       );
     }
-    
+
     return actions;
   };
 

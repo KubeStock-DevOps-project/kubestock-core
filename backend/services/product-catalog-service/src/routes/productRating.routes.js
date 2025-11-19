@@ -10,11 +10,7 @@ router.post(
   productRatingController.rateProduct
 );
 
-router.get(
-  "/my-ratings",
-  authMiddleware,
-  productRatingController.getMyRatings
-);
+router.get("/my-ratings", authMiddleware, productRatingController.getMyRatings);
 
 // Public routes
 router.get("/:productId/ratings", productRatingController.getProductRatings);

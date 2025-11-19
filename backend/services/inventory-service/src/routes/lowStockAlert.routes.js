@@ -11,12 +11,20 @@ router.get("/", authMiddleware, lowStockAlertController.getLowStockAlerts);
 router.post("/check", authMiddleware, lowStockAlertController.checkLowStock);
 
 // Get reorder suggestions
-router.get("/reorder-suggestions", authMiddleware, lowStockAlertController.getReorderSuggestions);
+router.get(
+  "/reorder-suggestions",
+  authMiddleware,
+  lowStockAlertController.getReorderSuggestions
+);
 
 // Get alert statistics
 router.get("/stats", authMiddleware, lowStockAlertController.getAlertStats);
 
 // Resolve alert
-router.patch("/:id/resolve", authMiddleware, lowStockAlertController.resolveAlert);
+router.patch(
+  "/:id/resolve",
+  authMiddleware,
+  lowStockAlertController.resolveAlert
+);
 
 module.exports = router;

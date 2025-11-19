@@ -16,7 +16,8 @@ const ProductList = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const canManageProducts = user?.role === "admin" || user?.role === "warehouse_staff";
+  const canManageProducts =
+    user?.role === "admin" || user?.role === "warehouse_staff";
 
   useEffect(() => {
     fetchProducts();

@@ -16,18 +16,10 @@ router.get("/:id", supplierController.getSupplierById);
 router.get("/:id/performance", supplierController.getSupplierPerformance);
 
 // Get current supplier's profile (for supplier users) - protected route
-router.get(
-  "/profile/me",
-  authMiddleware,
-  supplierController.getMyProfile
-);
+router.get("/profile/me", authMiddleware, supplierController.getMyProfile);
 
 // Update supplier profile (for supplier users) - protected route
-router.put(
-  "/profile/me",
-  authMiddleware,
-  supplierController.updateMyProfile
-);
+router.put("/profile/me", authMiddleware, supplierController.updateMyProfile);
 
 // Update supplier
 router.put("/:id", supplierController.updateSupplier);

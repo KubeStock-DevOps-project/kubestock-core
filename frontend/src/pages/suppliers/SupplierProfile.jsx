@@ -24,11 +24,14 @@ const SupplierProfile = () => {
   const fetchProfile = async () => {
     try {
       setLoading(true);
-      const response = await fetch("http://localhost:3004/api/suppliers/profile/me", {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
+      const response = await fetch(
+        "http://localhost:3004/api/suppliers/profile/me",
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
 
       if (!response.ok) throw new Error("Failed to fetch profile");
 
@@ -51,14 +54,17 @@ const SupplierProfile = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch("http://localhost:3004/api/suppliers/profile/me", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify(formData),
-      });
+      const response = await fetch(
+        "http://localhost:3004/api/suppliers/profile/me",
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          body: JSON.stringify(formData),
+        }
+      );
 
       if (!response.ok) throw new Error("Failed to update profile");
 
@@ -86,7 +92,11 @@ const SupplierProfile = () => {
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold">Contact Information</h2>
               {!editing && (
-                <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditing(true)}
+                >
                   Edit Profile
                 </Button>
               )}
@@ -99,7 +109,10 @@ const SupplierProfile = () => {
                   name="contact_person"
                   value={formData.contact_person}
                   onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, contact_person: e.target.value }))
+                    setFormData((prev) => ({
+                      ...prev,
+                      contact_person: e.target.value,
+                    }))
                   }
                   placeholder="John Doe"
                 />
@@ -127,7 +140,10 @@ const SupplierProfile = () => {
                   name="address"
                   value={formData.address}
                   onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, address: e.target.value }))
+                    setFormData((prev) => ({
+                      ...prev,
+                      address: e.target.value,
+                    }))
                   }
                   multiline
                   rows={3}
@@ -160,7 +176,9 @@ const SupplierProfile = () => {
                   <User className="text-primary" size={20} />
                   <div>
                     <p className="text-sm text-dark-600">Contact Person</p>
-                    <p className="font-medium">{profile?.contact_person || "Not set"}</p>
+                    <p className="font-medium">
+                      {profile?.contact_person || "Not set"}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -181,7 +199,9 @@ const SupplierProfile = () => {
                   <MapPin className="text-primary" size={20} />
                   <div>
                     <p className="text-sm text-dark-600">Address</p>
-                    <p className="font-medium">{profile?.address || "Not set"}</p>
+                    <p className="font-medium">
+                      {profile?.address || "Not set"}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -203,12 +223,16 @@ const SupplierProfile = () => {
               </div>
               <div>
                 <p className="text-sm text-dark-600">Payment Terms</p>
-                <p className="font-medium">{profile?.payment_terms || "Not set"}</p>
+                <p className="font-medium">
+                  {profile?.payment_terms || "Not set"}
+                </p>
               </div>
               <div>
                 <p className="text-sm text-dark-600">Rating</p>
                 <p className="font-medium">
-                  {profile?.rating ? `${parseFloat(profile.rating).toFixed(2)} / 5.0` : "No rating"}
+                  {profile?.rating
+                    ? `${parseFloat(profile.rating).toFixed(2)} / 5.0`
+                    : "No rating"}
                 </p>
               </div>
               <div>

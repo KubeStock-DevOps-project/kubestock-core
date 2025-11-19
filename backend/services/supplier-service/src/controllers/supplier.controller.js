@@ -161,10 +161,12 @@ class SupplierController {
       }
 
       // Calculate performance percentage
-      const totalDeliveries = supplier.on_time_deliveries + supplier.late_deliveries;
-      const onTimePercentage = totalDeliveries > 0
-        ? ((supplier.on_time_deliveries / totalDeliveries) * 100).toFixed(2)
-        : 0;
+      const totalDeliveries =
+        supplier.on_time_deliveries + supplier.late_deliveries;
+      const onTimePercentage =
+        totalDeliveries > 0
+          ? ((supplier.on_time_deliveries / totalDeliveries) * 100).toFixed(2)
+          : 0;
 
       res.json({
         success: true,
@@ -175,7 +177,9 @@ class SupplierController {
           on_time_deliveries: supplier.on_time_deliveries,
           late_deliveries: supplier.late_deliveries,
           on_time_percentage: parseFloat(onTimePercentage),
-          average_delivery_days: parseFloat(supplier.average_delivery_days || 0),
+          average_delivery_days: parseFloat(
+            supplier.average_delivery_days || 0
+          ),
           last_delivery_date: supplier.last_delivery_date,
           rating: parseFloat(supplier.rating || 0),
         },
@@ -223,9 +227,9 @@ class SupplierController {
     try {
       const supplierId = req.user.id; // From auth middleware
       const allowedFields = ["contact_person", "email", "phone", "address"];
-      
+
       const updateData = {};
-      allowedFields.forEach(field => {
+      allowedFields.forEach((field) => {
         if (req.body[field] !== undefined) {
           updateData[field] = req.body[field];
         }

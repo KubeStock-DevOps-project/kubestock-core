@@ -64,12 +64,7 @@ class LowStockAlertController {
            (product_id, sku, current_quantity, reorder_level, status)
            VALUES ($1, $2, $3, $4, 'active')
            RETURNING *`,
-          [
-            item.product_id,
-            item.sku,
-            item.current_quantity,
-            item.reorder_level,
-          ]
+          [item.product_id, item.sku, item.current_quantity, item.reorder_level]
         );
         alerts.push(alertResult.rows[0]);
       }

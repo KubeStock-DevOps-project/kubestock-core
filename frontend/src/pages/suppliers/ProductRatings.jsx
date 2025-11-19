@@ -72,7 +72,9 @@ const ProductRatings = () => {
       <Star
         key={i}
         size={16}
-        className={i < rating ? "fill-yellow-500 text-yellow-500" : "text-gray-300"}
+        className={
+          i < rating ? "fill-yellow-500 text-yellow-500" : "text-gray-300"
+        }
       />
     ));
   };
@@ -102,7 +104,9 @@ const ProductRatings = () => {
                   <h3 className="font-semibold">{rating.product_name}</h3>
                   <p className="text-sm text-dark-600">SKU: {rating.sku}</p>
                   {rating.review && (
-                    <p className="text-sm text-dark-700 mt-2">{rating.review}</p>
+                    <p className="text-sm text-dark-700 mt-2">
+                      {rating.review}
+                    </p>
                   )}
                 </div>
                 <div className="flex items-center gap-1">
@@ -132,7 +136,9 @@ const ProductRatings = () => {
                 </p>
                 {myRating ? (
                   <div className="flex items-center gap-2">
-                    <div className="flex gap-1">{renderStars(myRating.rating)}</div>
+                    <div className="flex gap-1">
+                      {renderStars(myRating.rating)}
+                    </div>
                     <span className="text-sm text-dark-600">Rated</span>
                   </div>
                 ) : (

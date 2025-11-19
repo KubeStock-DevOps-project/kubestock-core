@@ -12,7 +12,8 @@ import { useAuth } from "../../context/AuthContext";
 
 const PurchaseOrders = () => {
   const { user } = useAuth();
-  const canManagePO = user?.role === "admin" || user?.role === "warehouse_staff";
+  const canManagePO =
+    user?.role === "admin" || user?.role === "warehouse_staff";
   const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);

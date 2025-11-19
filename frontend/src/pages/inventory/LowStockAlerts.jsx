@@ -68,12 +68,15 @@ const LowStockAlerts = () => {
 
   const handleResolveAlert = async (id) => {
     try {
-      const response = await fetch(`http://localhost:3003/api/alerts/${id}/resolve`, {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
+      const response = await fetch(
+        `http://localhost:3003/api/alerts/${id}/resolve`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
 
       if (!response.ok) throw new Error("Failed to resolve alert");
 
@@ -99,7 +102,9 @@ const LowStockAlerts = () => {
       header: "Current Stock",
       accessor: "current_quantity",
       render: (row) => (
-        <span className="font-semibold text-red-600">{row.current_quantity}</span>
+        <span className="font-semibold text-red-600">
+          {row.current_quantity}
+        </span>
       ),
     },
     {
@@ -145,7 +150,9 @@ const LowStockAlerts = () => {
       header: "Current",
       accessor: "current_quantity",
       render: (row) => (
-        <span className="font-semibold text-red-600">{row.current_quantity}</span>
+        <span className="font-semibold text-red-600">
+          {row.current_quantity}
+        </span>
       ),
     },
     {
@@ -156,7 +163,9 @@ const LowStockAlerts = () => {
       header: "Suggested Order",
       accessor: "suggested_order_quantity",
       render: (row) => (
-        <span className="font-semibold text-primary">{row.suggested_order_quantity}</span>
+        <span className="font-semibold text-primary">
+          {row.suggested_order_quantity}
+        </span>
       ),
     },
     {
@@ -172,7 +181,9 @@ const LowStockAlerts = () => {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold text-dark-900">Low Stock Alerts</h1>
-          <p className="text-dark-600 mt-2">Monitor and manage inventory alerts</p>
+          <p className="text-dark-600 mt-2">
+            Monitor and manage inventory alerts
+          </p>
         </div>
         <Button variant="primary" onClick={handleCheckStock}>
           <RefreshCw size={20} className="mr-2" />

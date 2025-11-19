@@ -43,7 +43,11 @@ class ProductRatingController {
         `UPDATE products 
          SET average_rating = $1, total_ratings = $2
          WHERE id = $3`,
-        [avgResult.rows[0].avg_rating, avgResult.rows[0].total_ratings, productId]
+        [
+          avgResult.rows[0].avg_rating,
+          avgResult.rows[0].total_ratings,
+          productId,
+        ]
       );
 
       await client.query("COMMIT");
