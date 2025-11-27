@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/AsgardeoAuthContext";
 import Button from "../../components/common/Button";
 import Input from "../../components/common/Input";
 import { UserPlus } from "lucide-react";
