@@ -12,7 +12,7 @@ export const asgardeoConfig = {
   // Your Asgardeo organization name (from yourorg.asgardeo.io)
   baseUrl:
     import.meta.env.VITE_ASGARDEO_BASE_URL ||
-    "https://api.asgardeo.io/t/yourorg",
+    "https://api.asgardeo.io/t/dilanorg",
 
   // Client ID from Asgardeo console
   clientID: import.meta.env.VITE_ASGARDEO_CLIENT_ID,
