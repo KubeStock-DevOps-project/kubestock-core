@@ -103,12 +103,14 @@ export const AsgardeoAuthProvider = ({ children }) => {
           // Store token in API service
           if (accessToken) {
             localStorage.setItem("asgardeo_token", accessToken);
+            localStorage.setItem("token", accessToken); // Also store as 'token' for services
             console.log("💾 Token stored in localStorage");
           }
         } else {
           console.log("❌ User is not authenticated");
           setUser(null);
           localStorage.removeItem("asgardeo_token");
+          localStorage.removeItem("token"); // Also remove 'token'
         }
       } catch (error) {
         console.error("❌ Error initializing auth:", error);
