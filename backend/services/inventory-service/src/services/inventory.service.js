@@ -89,8 +89,10 @@ class InventoryService {
       await StockMovement.create(
         {
           product_id: productId,
+          sku: inventory.sku,
           quantity: -quantity,
-          movement_type: "reserved",
+          movement_type: "out",
+          reference_type: "order_reservation",
           reference_id: orderId.toString(),
           notes: `Stock reserved for order #${orderId}`,
         },
@@ -121,6 +123,12 @@ class InventoryService {
     try {
       await client.query("BEGIN");
 
+      // Get inventory SKU first
+      const inventory = await Inventory.findByProductId(productId);
+      if (!inventory) {
+        throw new Error("Product not found in inventory");
+      }
+
       const updateQuery = `
         UPDATE inventory 
         SET reserved_quantity = GREATEST(COALESCE(reserved_quantity, 0) - $1, 0),
@@ -135,8 +143,10 @@ class InventoryService {
       await StockMovement.create(
         {
           product_id: productId,
+          sku: inventory.sku,
           quantity: quantity,
-          movement_type: "released",
+          movement_type: "returned",
+          reference_type: "order_cancellation",
           reference_id: orderId.toString(),
           notes: `Stock released from cancelled order #${orderId}`,
         },
@@ -167,6 +177,12 @@ class InventoryService {
     try {
       await client.query("BEGIN");
 
+      // Get inventory SKU first
+      const inventory = await Inventory.findByProductId(productId);
+      if (!inventory) {
+        throw new Error("Product not found in inventory");
+      }
+
       // Deduct from both actual and reserved quantity
       const updateQuery = `
         UPDATE inventory 
@@ -184,8 +200,10 @@ class InventoryService {
       await StockMovement.create(
         {
           product_id: productId,
+          sku: inventory.sku,
           quantity: -quantity,
-          movement_type: "sale",
+          movement_type: "out",
+          reference_type: "order_fulfillment",
           reference_id: orderId.toString(),
           notes: `Stock sold - Order #${orderId} completed`,
         },
@@ -352,8 +370,10 @@ class InventoryService {
       await StockMovement.create(
         {
           product_id: productId,
+          sku: inventory.sku,
           quantity: quantity,
-          movement_type: "purchase",
+          movement_type: "in",
+          reference_type: "purchase_order",
           reference_id: supplierOrderId,
           notes:
             notes || `Stock received from supplier order #${supplierOrderId}`,

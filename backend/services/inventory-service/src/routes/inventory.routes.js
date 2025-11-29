@@ -40,6 +40,11 @@ router.put(
   validateUpdateInventory,
   inventoryController.updateInventory
 );
+router.put(
+  "/:id",
+  validateUpdateInventory,
+  inventoryController.updateInventoryById
+);
 
 // Delete
 router.delete("/product/:productId", inventoryController.deleteInventory);
