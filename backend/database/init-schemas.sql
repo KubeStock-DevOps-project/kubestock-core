@@ -98,6 +98,39 @@ CREATE INDEX IF NOT EXISTS idx_stock_movements_product ON stock_movements(produc
 CREATE INDEX IF NOT EXISTS idx_stock_movements_type ON stock_movements(movement_type);
 CREATE INDEX IF NOT EXISTS idx_stock_movements_created ON stock_movements(created_at);
 
+CREATE TABLE IF NOT EXISTS stock_alerts (
+    id SERIAL PRIMARY KEY,
+    product_id INTEGER NOT NULL,
+    sku VARCHAR(50) NOT NULL,
+    current_quantity INTEGER NOT NULL,
+    reorder_level INTEGER NOT NULL,
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'resolved', 'dismissed')),
+    alerted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    resolved_at TIMESTAMP,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS low_stock_alerts (
+    id SERIAL PRIMARY KEY,
+    product_id INTEGER NOT NULL,
+    sku VARCHAR(50) NOT NULL,
+    current_quantity INTEGER NOT NULL,
+    reorder_level INTEGER NOT NULL,
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'resolved', 'dismissed')),
+    alerted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    resolved_at TIMESTAMP,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_stock_alerts_product ON stock_alerts(product_id);
+CREATE INDEX IF NOT EXISTS idx_stock_alerts_status ON stock_alerts(status);
+CREATE INDEX IF NOT EXISTS idx_low_stock_alerts_product ON low_stock_alerts(product_id);
+CREATE INDEX IF NOT EXISTS idx_low_stock_alerts_status ON low_stock_alerts(status);
+
 -- Supplier Database Schema
 \c supplier_db;
 
