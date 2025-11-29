@@ -1,0 +1,36 @@
+# Instructions for adding Linkerd mesh to existing deployments
+#
+# Option 1: Annotate existing deployments (automatic injection)
+# kubectl annotate deployment user-service linkerd.io/inject=enabled -n default
+# kubectl annotate deployment inventory-service linkerd.io/inject=enabled -n default
+# kubectl annotate deployment order-service linkerd.io/inject=enabled -n default
+# kubectl annotate deployment product-catalog-service linkerd.io/inject=enabled -n default
+# kubectl annotate deployment supplier-service linkerd.io/inject=enabled -n default
+# kubectl annotate deployment kong-gateway linkerd.io/inject=enabled -n default
+#
+# Option 2: Restart deployments to inject proxies
+# kubectl rollout restart deployment -n default
+#
+# Option 3: Use kubectl kustomize with overlay (add to deployment.yaml):
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example-service
+  namespace: default
+  annotations:
+    linkerd.io/inject: enabled  # Add this annotation
+spec:
+  template:
+    metadata:
+      annotations:
+        linkerd.io/inject: enabled  # Or add here
+        config.linkerd.io/proxy-cpu-request: "100m"
+        config.linkerd.io/proxy-memory-request: "50Mi"
+        config.linkerd.io/proxy-cpu-limit: "1000m"
+        config.linkerd.io/proxy-memory-limit: "250Mi"
+    spec:
+      containers:
+        - name: service
+          # ... container spec
