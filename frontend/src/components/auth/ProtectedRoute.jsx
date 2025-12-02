@@ -2,7 +2,7 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "../../context/AsgardeoAuthContext";
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
-  const { user, loading } = useAuth();
+  const { user, loading, hasRole } = useAuth();
 
   if (loading) {
     return (
@@ -16,7 +16,8 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     return <Navigate to="/login" replace />;
   }
 
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
+  // Check if user has any of the allowed roles
+  if (allowedRoles && !hasRole(allowedRoles)) {
     return <Navigate to="/products" replace />;
   }
 

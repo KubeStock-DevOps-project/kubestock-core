@@ -36,6 +36,9 @@ import SupplierList from "./pages/suppliers/SupplierList";
 import PurchaseOrders from "./pages/suppliers/PurchaseOrders";
 import PurchaseRequests from "./pages/suppliers/PurchaseRequests";
 
+// Staff Pages
+import StaffList from "./pages/staff/StaffList";
+
 // Order Pages
 import OrderList from "./pages/orders/OrderList";
 import OrderDetails from "./pages/orders/OrderDetails";
@@ -185,7 +188,7 @@ function App() {
               <Route
                 path="/suppliers"
                 element={
-                  <ProtectedRoute allowedRoles={["admin", "warehouse_staff"]}>
+                  <ProtectedRoute allowedRoles={["admin"]}>
                     <SupplierList />
                   </ProtectedRoute>
                 }
@@ -203,6 +206,16 @@ function App() {
                 element={
                   <ProtectedRoute allowedRoles={["supplier"]}>
                     <PurchaseRequests />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Staff (Warehouse Staff Management) */}
+              <Route
+                path="/staff"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <StaffList />
                   </ProtectedRoute>
                 }
               />

@@ -33,16 +33,45 @@ export const AsgardeoAuthProvider = ({ children }) => {
   } = useAuthContext();
 
   /**
-   * Map Asgardeo groups to application roles
+   * Decode JWT token to get payload
    */
-  const mapGroupsToRole = (groups = []) => {
+  const decodeJWT = (token) => {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split('')
+          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      return JSON.parse(jsonPayload);
+    } catch (error) {
+      console.error("Error decoding JWT:", error);
+      return null;
+    }
+  };
+
+  /**
+   * Map Asgardeo groups to application roles
+   * Returns primary role and full roles list
+   */
+  const mapGroupsToRoles = (groups = []) => {
     const groupsLower = groups.map(g => g.toLowerCase());
+    const roles = [];
     
-    if (groupsLower.some(g => g.includes("admin"))) return "admin";
-    if (groupsLower.some(g => g.includes("warehouse") || g.includes("staff"))) return "warehouse_staff";
-    if (groupsLower.some(g => g.includes("supplier"))) return "supplier";
+    // Map groups to roles
+    if (groupsLower.some(g => g.includes("admin"))) roles.push("admin");
+    if (groupsLower.some(g => g.includes("warehouse") || g.includes("staff"))) roles.push("warehouse_staff");
+    if (groupsLower.some(g => g.includes("supplier"))) roles.push("supplier");
     
-    return "warehouse_staff"; // Default role
+    // Primary role (highest privilege first)
+    const primaryRole = roles.includes("admin") ? "admin" 
+      : roles.includes("warehouse_staff") ? "warehouse_staff"
+      : roles.includes("supplier") ? "supplier"
+      : "warehouse_staff";
+    
+    return { primaryRole, roles: roles.length > 0 ? roles : [primaryRole] };
   };
 
   // Initialize user when authentication state changes
@@ -51,17 +80,29 @@ export const AsgardeoAuthProvider = ({ children }) => {
       if (state.isAuthenticated) {
         try {
           const userInfo = await getBasicUserInfo();
+          const accessToken = await getAccessToken();
+          
+          // Decode access token to get groups (groups are in access token, not ID token)
+          const decodedAccessToken = decodeJWT(accessToken);
+          const groups = decodedAccessToken?.groups || [];
+          
+          console.log("Asgardeo user info:", userInfo);
+          console.log("Decoded Access Token:", decodedAccessToken);
+          console.log("Groups from access token:", groups);
+          
+          const { primaryRole, roles } = mapGroupsToRoles(groups);
           
           const mappedUser = {
             id: userInfo.sub,
             sub: userInfo.sub,
-            username: userInfo.username || userInfo.email?.split("@")[0],
-            email: userInfo.email,
-            fullName: userInfo.displayName || userInfo.name || "",
-            firstName: userInfo.givenName || "",
-            lastName: userInfo.familyName || "",
-            role: mapGroupsToRole(userInfo.groups),
-            groups: userInfo.groups || [],
+            username: userInfo.username || decodedAccessToken?.email?.split("@")[0],
+            email: decodedAccessToken?.email || userInfo.username,
+            fullName: userInfo.displayName || "",
+            firstName: decodedAccessToken?.given_name || "",
+            lastName: decodedAccessToken?.family_name || "",
+            role: primaryRole,
+            roles: roles, // Array of all roles the user has
+            groups: groups,
           };
           
           setUser(mappedUser);
@@ -75,7 +116,7 @@ export const AsgardeoAuthProvider = ({ children }) => {
     };
 
     initUser();
-  }, [state.isAuthenticated, getBasicUserInfo]);
+  }, [state.isAuthenticated, getBasicUserInfo, getAccessToken]);
 
   // Handle post-login navigation (only once per session)
   useEffect(() => {
@@ -144,10 +185,11 @@ export const AsgardeoAuthProvider = ({ children }) => {
     // Asgardeo SDK methods - use these directly for API calls
     getAccessToken,
     getIDToken,
-    // Role checking utility
-    hasRole: (roles) => {
-      if (!user) return false;
-      return Array.isArray(roles) ? roles.includes(user.role) : user.role === roles;
+    // Role checking utility - checks against user.roles array
+    hasRole: (allowedRoles) => {
+      if (!user || !user.roles) return false;
+      const rolesArray = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
+      return rolesArray.some(role => user.roles.includes(role));
     },
   };
 

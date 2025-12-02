@@ -5,7 +5,6 @@ import { useState } from "react";
 const Navbar = ({ toggleSidebar }) => {
   const { user, logout, openMyAccount } = useAuth();
   const [showDropdown, setShowDropdown] = useState(false);
-
   return (
     <nav className="bg-white shadow-sm border-b border-dark-200 px-6 py-4">
       <div className="flex items-center justify-between">

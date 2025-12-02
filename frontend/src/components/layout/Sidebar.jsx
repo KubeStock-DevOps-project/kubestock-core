@@ -13,7 +13,6 @@ import {
   GitBranch,
   Calculator,
   AlertTriangle,
-  Star,
   UserCog,
 } from "lucide-react";
 import { cn } from "../../utils/helpers";
@@ -21,15 +20,18 @@ import { cn } from "../../utils/helpers";
 const Sidebar = ({ isOpen, setIsOpen }) => {
   const { user } = useAuth();
 
+  // Determine dashboard path based on roles (use primary role)
+  const getDashboardPath = () => {
+    if (user?.roles?.includes("admin")) return "/dashboard/admin";
+    if (user?.roles?.includes("warehouse_staff")) return "/dashboard/warehouse";
+    if (user?.roles?.includes("supplier")) return "/dashboard/supplier";
+    return "/dashboard/admin"; // Default
+  };
+
   const menuItems = [
     {
       name: "Dashboard",
-      path:
-        user?.role === "admin"
-          ? "/dashboard/admin"
-          : user?.role === "warehouse_staff"
-          ? "/dashboard/warehouse"
-          : "/dashboard/supplier",
+      path: getDashboardPath(),
       icon: LayoutDashboard,
       roles: ["admin", "warehouse_staff", "supplier"],
     },
@@ -73,7 +75,13 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
       name: "Suppliers",
       path: "/suppliers",
       icon: Truck,
-      roles: ["admin", "warehouse_staff"],
+      roles: ["admin"],
+    },
+    {
+      name: "Warehouse Staff",
+      path: "/staff",
+      icon: Users,
+      roles: ["admin"],
     },
     {
       name: "Purchase Orders",
@@ -85,12 +93,6 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
       name: "Purchase Requests",
       path: "/purchase-requests",
       icon: ShoppingCart,
-      roles: ["supplier"],
-    },
-    {
-      name: "My Profile",
-      path: "/supplier-profile",
-      icon: UserCog,
       roles: ["supplier"],
     },
     {
@@ -107,8 +109,9 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
     },
   ];
 
+  // Filter menu items based on user's roles (array)
   const filteredMenuItems = menuItems.filter((item) =>
-    item.roles.includes(user?.role)
+    item.roles.some(role => user?.roles?.includes(role))
   );
 
   return (
