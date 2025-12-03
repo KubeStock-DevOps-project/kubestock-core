@@ -1,472 +1,326 @@
-# GitOps CI/CD Integration
+# GitOps CI/CD Pipeline Guide
 
 ## Overview
 
-The CI/CD pipeline has been enhanced with GitOps principles, integrating seamlessly with ArgoCD for automated deployments.
+The CI/CD pipeline uses GitOps principles with ArgoCD. It consists of 6 stages split across two workflows:
 
-## How It Works
+- **Staging Pipeline** (`ci-cd-staging.yml`): Stages 1-4, triggered automatically on push to `main`/`develop`
+- **Production Pipeline** (`ci-cd-production.yml`): Stages 5-6, triggered manually with approval
 
-### Traditional CI/CD (Before)
 ```
-GitHub → Build → Push Image → kubectl apply → K8s Cluster
+Staging (Auto):     [Stage 1] → [Stage 2] → [Stage 3] → [Stage 4] → ArgoCD Sync
+Production (Manual): ────────────────────────────────────[Stage 5] → [Stage 6]
 ```
 
-### GitOps CI/CD (Now)
+---
+
+## Stage 1: Monitor & Trigger
+
+**File:** `ci-cd-staging.yml`  
+**Trigger:** Push to `main` or `develop`, or Pull Request
+
+### What Happens:
+1. Checks out the repository
+2. Compares current commit with previous to detect which services changed
+3. Outputs flags for each service indicating if it was modified
+
+### Change Detection:
+```bash
+# Compares file paths to determine affected services
+git diff --name-only "$BASE_SHA" "$HEAD_SHA" | grep 'backend/services/<service>'
 ```
-GitHub → Build → Push Image → Update Git Manifests → ArgoCD Detects → K8s Cluster
-                                      ↑
-                                  (Stage 4)
+
+### Outputs:
+- `user_service_changed`
+- `product_service_changed`
+- `inventory_service_changed`
+- `order_service_changed`
+- `supplier_service_changed`
+- `frontend_changed`
+
+---
+
+## Stage 2: Build & Containerize
+
+**Depends on:** Stage 1  
+**Runs:** In parallel for all 6 services
+
+### What Happens:
+1. Logs into GitHub Container Registry (GHCR)
+2. Builds Docker image for each service using its Dockerfile
+3. Pushes images to GHCR with multiple tags
+
+### Services Built:
+| Service | Context Path | Dockerfile |
+|---------|--------------|------------|
+| user-service | `./backend/services/user-service` | `Dockerfile` |
+| product-catalog-service | `./backend/services/product-catalog-service` | `Dockerfile` |
+| inventory-service | `./backend/services/inventory-service` | `Dockerfile` |
+| order-service | `./backend/services/order-service` | `Dockerfile` |
+| supplier-service | `./backend/services/supplier-service` | `Dockerfile` |
+| frontend | `./frontend` | `Dockerfile` |
+
+### Image Tags Applied:
+- `sha-<commit-hash>` - Immutable, tied to specific commit
+- `staging-latest` - Latest staging build (main branch only)
+- Branch name tag
+
+### Image Location:
 ```
+ghcr.io/<owner>/inventory-system/<service-name>:sha-<commit>
+```
+
+---
+
+## Stage 3: Security Scan
+
+**Depends on:** Stage 2  
+**Runs:** In parallel for all 6 services
+
+### What Happens:
+1. Pulls the built image from GHCR
+2. Runs Trivy vulnerability scanner
+3. Reports findings in table format (console output)
+4. Generates SARIF report for GitHub Security tab
+
+### Trivy Configuration:
+- **Severity levels:** CRITICAL, HIGH, MEDIUM
+- **Output formats:** Table (console), SARIF (GitHub Security)
+- **Behavior:** Continues on error (non-blocking)
+
+### Results:
+- View in GitHub Actions logs (table format)
+- View in repository Security tab (SARIF upload)
+
+---
 
 ## Stage 4: GitOps Update
 
-**Previous Behavior:**
-- Directly applied changes using `kubectl`
-- Required cluster credentials in CI/CD
-- Manual deployment process
+**Depends on:** Stage 3  
+**Condition:** Only runs on `main` or `develop` branches
 
-**New Behavior:**
-- Updates image tags in `k8s/base/services/*/deployment.yaml`
-- Commits changes back to Git repository
-- ArgoCD detects changes automatically
-- Deploys via GitOps (auto-sync enabled for staging)
+### What Happens:
+1. Checks out repository with write permissions
+2. Updates image tags in Kubernetes deployment manifests
+3. Commits changes to Git
+4. Pushes to repository
+5. ArgoCD detects changes and syncs automatically
 
-### What Happens in Stage 4
-
-1. **Checkout Repository**
-   - Fetches latest code with write permissions
-
-2. **Update Manifests**
-   - Updates all service deployment files with new image tags
-   - Tag format: `sha-<commit-hash>`
-   
-3. **Commit Changes**
-   - Creates automated commit with image tag updates
-   - Message includes service list and trigger info
-
-4. **Push to Repository**
-   - Pushes changes to same branch
-   - Triggers ArgoCD change detection
-
-5. **ArgoCD Deployment**
-   - ArgoCD detects manifest changes (polling every 3 minutes)
-   - Auto-syncs staging environment
-   - Production requires manual approval
-
-## Benefits
-
-### 1. **Declarative Infrastructure**
-- Git is single source of truth
-- All changes tracked in version control
-- Easy rollback via Git revert
-
-### 2. **Audit Trail**
-- Every deployment creates Git commit
-- Full history of what was deployed when
-- Compliance-friendly
-
-### 3. **Security**
-- No cluster credentials in CI/CD
-- ArgoCD handles authentication
-- Reduced attack surface
-
-### 4. **Separation of Concerns**
-- CI/CD builds and tests
-- ArgoCD handles deployment
-- Clear responsibility boundaries
-
-### 5. **Consistency**
-- Same deployment process everywhere
-- Manual and automated deploys use same path
-- Reduces configuration drift
-
-## Configuration
-
-### GitHub Actions Workflow
-
-**File:** `.github/workflows/ci-cd-staging.yml`
-
-**Key Changes:**
-```yaml
-stage-4-deploy-staging:
-  permissions:
-    contents: write  # Required to push changes
-  
-  steps:
-    - name: Update image tags
-      run: |
-        sed -i "s|image: .*/user-service:.*|image: ghcr.io/.../user-service:sha-${{ github.sha }}|g" \
-          k8s/base/services/user-service/deployment.yaml
-    
-    - name: Commit and push
-      run: |
-        git add k8s/base/services/*/deployment.yaml
-        git commit -m "chore: update image tags"
-        git push origin HEAD:${{ github.ref_name }}
+### Manifest Updates:
+```bash
+# Updates each service's deployment.yaml
+sed -i "s|image: ghcr.io/.*/<service>:.*|image: ghcr.io/<owner>/<service>:sha-${NEW_TAG}|g" \
+  k8s/base/services/<service>/deployment.yaml
 ```
 
-### ArgoCD Application
-
-**File:** `k8s/argocd/applications/inventory-system-staging.yaml`
-
-**Sync Policy:**
-```yaml
-syncPolicy:
-  automated:
-    prune: true      # Delete resources not in Git
-    selfHeal: true   # Revert manual changes
-    allowEmpty: false
-  syncOptions:
-    - CreateNamespace=true
-  retry:
-    limit: 5
-    backoff:
-      duration: 5s
+### Files Modified:
+```
+k8s/base/services/
+├── user-service/deployment.yaml
+├── product-catalog-service/deployment.yaml
+├── inventory-service/deployment.yaml
+├── order-service/deployment.yaml
+└── supplier-service/deployment.yaml
 ```
 
-## Deployment Flow
-
-### Staging Environment (Auto-Sync)
-
+### Commit Message Format:
 ```
-1. Developer pushes code
-   ↓
-2. CI/CD builds image
-   ↓
-3. Image pushed to registry
-   ↓
-4. CI/CD updates K8s manifests in Git
-   ↓
-5. ArgoCD detects change (within 3 minutes)
-   ↓
-6. ArgoCD syncs staging automatically
-   ↓
-7. New version deployed
+chore(deploy): update image tags to sha-<commit>
+
+Auto-generated by CI/CD pipeline
+
+Updated services:
+- user-service
+- product-catalog-service
+- inventory-service
+- order-service
+- supplier-service
+
+Commit: <sha>
+Branch: <branch>
+Triggered by: <actor>
 ```
 
-**Timeline:**
-- Build & push: ~2-3 minutes
-- Manifest update: ~30 seconds
-- ArgoCD detection: ~0-3 minutes
-- Deployment: ~1-2 minutes
-- **Total: 3-8 minutes**
+### After Push:
+- ArgoCD polls the Git repository (every 3 minutes)
+- Detects manifest changes
+- Auto-syncs staging environment (if auto-sync enabled)
 
-### Production Environment (Manual Sync)
+---
+
+## Stage 5: Manual Approval
+
+**File:** `ci-cd-production.yml`  
+**Trigger:** Manual `workflow_dispatch`
+
+### Inputs Required:
+| Input | Description | Required |
+|-------|-------------|----------|
+| `sha` | Git commit SHA to deploy | Yes |
+| `deployment_strategy` | `canary`, `blue-green`, or `rolling` | Yes (default: canary) |
+
+### What Happens:
+1. Workflow pauses at `production-approval` environment
+2. Designated reviewers receive notification
+3. Reviewer approves or rejects in GitHub UI
+4. On approval, proceeds to Stage 6
+
+### GitHub Environment Setup:
+- Create environment named `production-approval`
+- Add required reviewers
+- Enable "Required reviewers" protection rule
+
+---
+
+## Stage 6: Production Deployment
+
+**Depends on:** Stage 5 (approval)  
+**Runs:** One of three strategies based on input
+
+### Canary Deployment (default)
+Progressive traffic shifting:
 
 ```
-1-4. Same as staging
-   ↓
-5. ArgoCD detects change
-   ↓
-6. Manual approval required
-   ↓
-7. Operator clicks "Sync" in ArgoCD UI
-   ↓
-8. Production deployed
+Phase 1: Deploy canary pods (10% traffic)
+         ↓ Monitor metrics (error rate, latency)
+Phase 2: Increase to 50% traffic
+         ↓ Monitor metrics
+Phase 3: Promote to 100% traffic
+         ↓ Remove canary pods
 ```
 
-## Monitoring Deployment
+**Rollback trigger:** High error rate or latency spike
 
-### Via ArgoCD UI
+### Blue-Green Deployment
+Zero-downtime switchover:
+
+```
+1. Deploy to "green" environment (inactive)
+2. Run smoke tests on green
+3. Switch load balancer from blue → green
+4. Keep blue as backup (1 hour)
+5. Cleanup blue after verification
+```
+
+**Rollback:** Switch load balancer back to blue
+
+### Rolling Deployment
+Service-by-service update:
+
+```
+For each service:
+  1. Update deployment image
+  2. Wait for rollout to complete
+  3. Verify health
+  4. Move to next service
+```
+
+**Rollback:** `kubectl rollout undo deployment/<service>`
+
+---
+
+## Pipeline Flow Summary
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                    STAGING WORKFLOW                               │
+│                    (ci-cd-staging.yml)                           │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│   Push to main/develop                                           │
+│         │                                                        │
+│         ▼                                                        │
+│   ┌─────────────┐                                                │
+│   │  Stage 1    │  Detect changed services                       │
+│   │  Trigger    │  Output: which services to build               │
+│   └──────┬──────┘                                                │
+│          │                                                       │
+│          ▼                                                        │
+│   ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
+│   │  Build      │  │  Build      │  │  Build      │  ... (x6)   │
+│   │  user-svc   │  │  product    │  │  inventory  │             │
+│   └──────┬──────┘  └──────┬──────┘  └──────┬──────┘             │
+│          │                │                │                     │
+│          └────────────────┼────────────────┘                     │
+│                           ▼                                       │
+│   ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
+│   │  Trivy      │  │  Trivy      │  │  Trivy      │  ... (x6)   │
+│   │  Scan       │  │  Scan       │  │  Scan       │             │
+│   └──────┬──────┘  └──────┬──────┘  └──────┬──────┘             │
+│          │                │                │                     │
+│          └────────────────┼────────────────┘                     │
+│                           ▼                                       │
+│   ┌─────────────────────────────────────────────────────────┐   │
+│   │  Stage 4: GitOps Update                                  │   │
+│   │  - Update k8s/base/services/*/deployment.yaml           │   │
+│   │  - Commit and push to Git                                │   │
+│   └──────────────────────────┬──────────────────────────────┘   │
+│                              │                                   │
+└──────────────────────────────┼───────────────────────────────────┘
+                               ▼
+                    ┌─────────────────────┐
+                    │  ArgoCD detects     │
+                    │  manifest changes   │
+                    │  → Auto-sync        │
+                    └─────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│                   PRODUCTION WORKFLOW                             │
+│                   (ci-cd-production.yml)                         │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│   Manual trigger (workflow_dispatch)                             │
+│   Input: sha, deployment_strategy                                │
+│         │                                                        │
+│         ▼                                                        │
+│   ┌─────────────────────────────────────────────────────────┐   │
+│   │  Stage 5: Manual Approval                                │   │
+│   │  - Waits for reviewer approval                           │   │
+│   │  - Environment: production-approval                      │   │
+│   └──────────────────────────┬──────────────────────────────┘   │
+│                              │                                   │
+│                              ▼                                   │
+│   ┌─────────────────────────────────────────────────────────┐   │
+│   │  Stage 6: Deploy to Production                          │   │
+│   │  - Canary: 10% → 50% → 100%                             │   │
+│   │  - Blue-Green: Deploy green → Switch                     │   │
+│   │  - Rolling: Service-by-service                           │   │
+│   └─────────────────────────────────────────────────────────┘   │
+│                                                                   │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Triggering Deployments
+
+### Staging (Automatic)
+```bash
+git push origin main
+```
+
+### Production (Manual)
+```bash
+# Via GitHub CLI
+gh workflow run ci-cd-production.yml \
+  -f sha=abc123def456 \
+  -f deployment_strategy=canary
+
+# Via GitHub UI
+# Actions → ci-cd-production.yml → Run workflow → Fill inputs
+```
+
+---
+
+## Monitoring
 
 ```bash
-# Port-forward ArgoCD
-kubectl port-forward svc/argocd-server -n argocd 8080:443
-
-# Access UI
-https://localhost:8080
-# Login: admin / <password from install>
-```
-
-### Via kubectl
-
-```bash
-# Check application status
+# ArgoCD status
 kubectl get applications -n argocd
 
-# Describe application
-kubectl describe application inventory-system-staging -n argocd
+# Pod status
+kubectl get pods -n inventory-system
 
-# Watch deployment progress
-kubectl get pods -n inventory-system -w
+# Rollout status
+kubectl rollout status deployment/<service> -n inventory-system
 ```
-
-### Via ArgoCD CLI
-
-```bash
-# Install CLI
-curl -sSL -o argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
-chmod +x argocd
-sudo mv argocd /usr/local/bin/
-
-# Login
-argocd login localhost:8080
-
-# Check app status
-argocd app get inventory-system-staging
-
-# View sync history
-argocd app history inventory-system-staging
-
-# Manual sync production
-argocd app sync inventory-system-production
-```
-
-## Rollback Procedure
-
-### Via Git (Recommended)
-
-```bash
-# Revert to previous commit
-git revert HEAD
-git push
-
-# ArgoCD will auto-deploy previous version
-```
-
-### Via ArgoCD UI
-
-1. Go to application in ArgoCD UI
-2. Click "History and Rollback"
-3. Select previous revision
-4. Click "Rollback"
-
-### Via ArgoCD CLI
-
-```bash
-# View history
-argocd app history inventory-system-staging
-
-# Rollback to specific revision
-argocd app rollback inventory-system-staging <revision-id>
-```
-
-## Troubleshooting
-
-### Changes Not Deploying
-
-**Problem:** Manifest updated but ArgoCD not syncing
-
-**Solutions:**
-
-1. **Check sync policy**
-   ```bash
-   kubectl get application inventory-system-staging -n argocd -o yaml | grep -A 10 syncPolicy
-   ```
-
-2. **Force refresh**
-   ```bash
-   argocd app get inventory-system-staging --refresh
-   ```
-
-3. **Manual sync**
-   ```bash
-   argocd app sync inventory-system-staging
-   ```
-
-4. **Check ArgoCD logs**
-   ```bash
-   kubectl logs -n argocd deployment/argocd-application-controller
-   ```
-
-### Manifest Update Failed
-
-**Problem:** CI/CD cannot push to Git
-
-**Solutions:**
-
-1. **Check permissions**
-   - Ensure `contents: write` in workflow
-   - Verify `GITHUB_TOKEN` has push access
-
-2. **Check branch protection**
-   - May need to disable branch protection
-   - Or use deploy key with bypass
-
-3. **Manual merge conflicts**
-   ```bash
-   # If CI created orphan commits
-   git fetch origin
-   git merge origin/main
-   git push
-   ```
-
-### Image Not Updating
-
-**Problem:** New image pushed but pods not restarting
-
-**Solutions:**
-
-1. **Verify image tag in manifest**
-   ```bash
-   cat k8s/base/services/user-service/deployment.yaml | grep image:
-   ```
-
-2. **Check ArgoCD sync status**
-   ```bash
-   argocd app get inventory-system-staging
-   ```
-
-3. **Force pod restart**
-   ```bash
-   kubectl rollout restart deployment/user-service -n inventory-system
-   ```
-
-## Best Practices
-
-### 1. **Small, Frequent Commits**
-- Easier to rollback
-- Faster feedback
-- Less risky
-
-### 2. **Meaningful Commit Messages**
-- Include service names
-- Reference issue/PR numbers
-- Note breaking changes
-
-### 3. **Monitor Deployments**
-- Watch ArgoCD sync status
-- Check application health
-- Review metrics after deploy
-
-### 4. **Test in Staging First**
-- Auto-sync staging
-- Manual production
-- Verify before promoting
-
-### 5. **Use Image Digests (Advanced)**
-```yaml
-image: ghcr.io/org/service@sha256:abc123...
-```
-- Immutable references
-- Guaranteed reproducibility
-- Prevents tag mutation
-
-## Integration with Other Tools
-
-### Prometheus Alerts
-
-Monitor ArgoCD sync status:
-```yaml
-- alert: ArgoAppSyncFailed
-  expr: argocd_app_sync_status{sync_status!="Synced"} == 1
-  for: 10m
-  annotations:
-    summary: "ArgoCD app {{ $labels.name }} sync failed"
-```
-
-### Slack Notifications
-
-ArgoCD webhook for Slack:
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: argocd-notifications-cm
-  namespace: argocd
-data:
-  service.slack: |
-    token: $slack-token
-  trigger.on-sync-succeeded: |
-    - send: [slack-success]
-```
-
-### GitOps Dashboard
-
-Monitor all deployments:
-```bash
-# Install Argo CD Dashboard
-kubectl port-forward svc/argocd-server -n argocd 8080:443
-```
-
-## Security Considerations
-
-### 1. **Secrets Management**
-- Don't commit secrets to Git
-- Use Sealed Secrets or External Secrets Operator
-- Example:
-  ```bash
-  kubectl create secret generic db-password \
-    --from-literal=password=secret \
-    --dry-run=client -o yaml | \
-    kubeseal -o yaml > sealed-secret.yaml
-  ```
-
-### 2. **RBAC**
-- Limit who can sync production
-- Use ArgoCD projects for isolation
-- Implement approval workflows
-
-### 3. **Image Verification**
-- Sign images with cosign
-- Verify signatures in admission webhook
-- Use only trusted registries
-
-### 4. **Branch Protection**
-- Require PR reviews
-- Enforce status checks
-- Prevent force pushes
-
-## Advanced: Multi-Environment Promotion
-
-### Using Branches
-
-```
-main → staging (auto-sync)
-production → production (manual sync)
-```
-
-### Using Kustomize Overlays
-
-```
-base/
-  ├── deployment.yaml (with image placeholders)
-overlays/
-  ├── staging/
-  │   └── kustomization.yaml (staging values)
-  └── production/
-      └── kustomization.yaml (production values)
-```
-
-### Using Helm Values
-
-```yaml
-# staging-values.yaml
-image:
-  tag: sha-abc123
-
-# production-values.yaml  
-image:
-  tag: sha-xyz789
-```
-
-## Comparison: GitOps vs Traditional
-
-| Aspect | Traditional CI/CD | GitOps CI/CD |
-|--------|------------------|--------------|
-| **Deployment** | kubectl apply | Git commit |
-| **Credentials** | In CI/CD | In cluster |
-| **Audit Trail** | CI/CD logs | Git history |
-| **Rollback** | Re-run pipeline | Git revert |
-| **Drift Detection** | Manual | Automatic |
-| **Approval** | Custom gates | Git PR |
-| **Speed** | Immediate | 0-3 min delay |
-| **Complexity** | Lower | Higher |
-| **Scalability** | Limited | Excellent |
-
-## Conclusion
-
-GitOps integration provides:
-- ✅ Better security
-- ✅ Complete audit trail
-- ✅ Easy rollbacks
-- ✅ Automated drift detection
-- ✅ Scalable multi-cluster deployments
-
-The slight delay (0-3 minutes) for ArgoCD change detection is acceptable for the benefits gained.
-
-## References
-
-- [ArgoCD Documentation](https://argo-cd.readthedocs.io/)
-- [GitOps Principles](https://opengitops.dev/)
-- [Kubernetes GitOps Best Practices](https://kubernetes.io/docs/concepts/overview/working-with-objects/declarative-config/)
