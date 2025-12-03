@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
 import toast from "react-hot-toast";
 import Card from "../../components/common/Card";
 import Table from "../../components/common/Table";
 import Badge from "../../components/common/Badge";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
+import { inventoryService } from "../../services/inventoryService";
 import {
   FiPackage,
   FiAlertTriangle,
@@ -29,8 +29,8 @@ const InventoryDashboard = () => {
   const fetchInventory = async () => {
     try {
       setLoading(true);
-      const res = await axios.get("http://localhost:3003/api/inventory");
-      const inventoryData = res.data.data || [];
+      const res = await inventoryService.getAllInventory();
+      const inventoryData = res.data || [];
       setInventory(inventoryData);
 
       // Calculate stats

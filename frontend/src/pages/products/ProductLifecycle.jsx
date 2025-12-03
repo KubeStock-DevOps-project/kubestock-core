@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import axios from "../../utils/axios";
 import toast from "react-hot-toast";
 import Card from "../../components/common/Card";
 import Button from "../../components/common/Button";
@@ -7,6 +6,11 @@ import Input from "../../components/common/Input";
 import Badge from "../../components/common/Badge";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
 import { useAuth } from "../../context/AsgardeoAuthContext";
+import { productService } from "../../services/productService";
+import { createApiClient } from "../../utils/axios";
+import { SERVICES } from "../../utils/constants";
+
+const productApi = createApiClient(SERVICES.PRODUCT);
 
 const ProductLifecycleManagement = () => {
   const { user } = useAuth();
@@ -37,14 +41,14 @@ const ProductLifecycleManagement = () => {
     try {
       setLoading(true);
       const [statsRes, pendingRes, productsRes] = await Promise.all([
-        axios.get("http://localhost:3002/api/products/lifecycle-stats"),
-        axios.get("http://localhost:3002/api/products/pending-approvals"),
-        axios.get("http://localhost:3002/api/products"),
+        productApi.get("/api/products/lifecycle-stats"),
+        productApi.get("/api/products/pending-approvals"),
+        productService.getAllProducts(),
       ]);
 
       setLifecycleStats(statsRes.data.data || {});
       setPendingApprovals(pendingRes.data.data || []);
-      setProducts(productsRes.data.data || []);
+      setProducts(productsRes.data || []);
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
@@ -55,7 +59,7 @@ const ProductLifecycleManagement = () => {
   const handleCreateProduct = async (e) => {
     e.preventDefault();
     try {
-      await axios.post("http://localhost:3002/api/products/lifecycle", {
+      await productApi.post("/api/products/lifecycle", {
         ...formData,
         created_by: 1,
       });
@@ -77,13 +81,10 @@ const ProductLifecycleManagement = () => {
 
   const handleTransition = async (productId, action) => {
     try {
-      await axios.post(
-        `http://localhost:3002/api/products/${productId}/${action}`,
-        {
-          userId: 1,
-          notes: `${action} action`,
-        }
-      );
+      await productApi.post(`/api/products/${productId}/${action}`, {
+        userId: 1,
+        notes: `${action} action`,
+      });
       toast.success(`Product ${action} successfully!`);
       fetchData();
     } catch (error) {
@@ -93,8 +94,8 @@ const ProductLifecycleManagement = () => {
 
   const viewHistory = async (product) => {
     try {
-      const res = await axios.get(
-        `http://localhost:3002/api/products/${product.id}/lifecycle-history`
+      const res = await productApi.get(
+        `/api/products/${product.id}/lifecycle-history`
       );
       setHistory(res.data.data || []);
       setSelectedProduct(product);

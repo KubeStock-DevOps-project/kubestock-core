@@ -44,13 +44,25 @@ export const API_ENDPOINTS = {
   },
 };
 
-export const SERVICES = {
+// Environment detection
+const isDevelopment = import.meta.env.MODE === 'development';
+
+// API Gateway URL for staging/production environments
+const API_GATEWAY_URL = import.meta.env.VITE_API_GATEWAY_URL || '';
+
+// In development: call each microservice directly
+// In staging/production: call through API gateway
+export const SERVICES = isDevelopment ? {
   PRODUCT: import.meta.env.VITE_PRODUCT_SERVICE_URL || "http://localhost:3002",
-  INVENTORY:
-    import.meta.env.VITE_INVENTORY_SERVICE_URL || "http://localhost:3003",
-  SUPPLIER:
-    import.meta.env.VITE_SUPPLIER_SERVICE_URL || "http://localhost:3004",
+  INVENTORY: import.meta.env.VITE_INVENTORY_SERVICE_URL || "http://localhost:3003",
+  SUPPLIER: import.meta.env.VITE_SUPPLIER_SERVICE_URL || "http://localhost:3004",
   ORDER: import.meta.env.VITE_ORDER_SERVICE_URL || "http://localhost:3005",
-  IDENTITY:
-    import.meta.env.VITE_IDENTITY_SERVICE_URL || "http://localhost:3006",
+  IDENTITY: import.meta.env.VITE_IDENTITY_SERVICE_URL || "http://localhost:3006",
+} : {
+  // All services go through API gateway in non-dev environments
+  PRODUCT: `${API_GATEWAY_URL}/product-catalog`,
+  INVENTORY: `${API_GATEWAY_URL}/inventory`,
+  SUPPLIER: `${API_GATEWAY_URL}/supplier`,
+  ORDER: `${API_GATEWAY_URL}/order`,
+  IDENTITY: `${API_GATEWAY_URL}/identity`,
 };

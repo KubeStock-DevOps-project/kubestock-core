@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
-import axios from "../../utils/axios";
 import toast from "react-hot-toast";
 import Card from "../../components/common/Card";
 import Button from "../../components/common/Button";
 import Input from "../../components/common/Input";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
+import { productService } from "../../services/productService";
+import { createApiClient } from "../../utils/axios";
+import { SERVICES } from "../../utils/constants";
+
+const productApi = createApiClient(SERVICES.PRODUCT);
 
 const PricingCalculator = () => {
   const [products, setProducts] = useState([]);
@@ -37,8 +41,8 @@ const PricingCalculator = () => {
 
   const fetchProducts = async () => {
     try {
-      const res = await axios.get("http://localhost:3002/api/products");
-      setProducts(res.data.data || []);
+      const res = await productService.getAllProducts();
+      setProducts(res.data || []);
     } catch (error) {
       console.error("Error fetching products:", error);
     }
@@ -52,16 +56,13 @@ const PricingCalculator = () => {
 
     try {
       setLoading(true);
-      const res = await axios.post(
-        "http://localhost:3002/api/pricing/calculate",
-        {
-          productId: parseInt(calculator.productId),
-          quantity: parseInt(calculator.quantity),
-          customerId: calculator.customerId
-            ? parseInt(calculator.customerId)
-            : null,
-        }
-      );
+      const res = await productApi.post("/api/pricing/calculate", {
+        productId: parseInt(calculator.productId),
+        quantity: parseInt(calculator.quantity),
+        customerId: calculator.customerId
+          ? parseInt(calculator.customerId)
+          : null,
+      });
       setPricingResult(res.data.data);
       scrollToResults();
     } catch (error) {
@@ -80,16 +81,13 @@ const PricingCalculator = () => {
 
     try {
       setLoading(true);
-      const res = await axios.post(
-        "http://localhost:3002/api/pricing/calculate-bundle",
-        {
-          items: validItems.map((item) => ({
-            productId: parseInt(item.productId),
-            quantity: parseInt(item.quantity),
-            customerId: item.customerId ? parseInt(item.customerId) : null,
-          })),
-        }
-      );
+      const res = await productApi.post("/api/pricing/calculate-bundle", {
+        items: validItems.map((item) => ({
+          productId: parseInt(item.productId),
+          quantity: parseInt(item.quantity),
+          customerId: item.customerId ? parseInt(item.customerId) : null,
+        })),
+      });
       setPricingResult(res.data.data);
       scrollToResults();
     } catch (error) {

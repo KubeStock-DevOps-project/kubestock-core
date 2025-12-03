@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
 import toast from "react-hot-toast";
 import Card from "../../components/common/Card";
 import Button from "../../components/common/Button";
 import Table from "../../components/common/Table";
 import Input from "../../components/common/Input";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
+import { productService } from "../../services/productService";
 import { FiPlus, FiEdit, FiTrash2, FiTag } from "react-icons/fi";
 
 const CategoryList = () => {
@@ -25,8 +25,8 @@ const CategoryList = () => {
   const fetchCategories = async () => {
     try {
       setLoading(true);
-      const res = await axios.get("http://localhost:3002/api/categories");
-      setCategories(res.data.data || []);
+      const res = await productService.getAllCategories();
+      setCategories(res.data || []);
     } catch (error) {
       console.error("Error fetching categories:", error);
       toast.error("Failed to load categories");
@@ -50,13 +50,10 @@ const CategoryList = () => {
     e.preventDefault();
     try {
       if (editingCategory) {
-        await axios.put(
-          `http://localhost:3002/api/categories/${editingCategory.id}`,
-          formData
-        );
+        await productService.updateCategory(editingCategory.id, formData);
         toast.success("Category updated successfully!");
       } else {
-        await axios.post("http://localhost:3002/api/categories", formData);
+        await productService.createCategory(formData);
         toast.success("Category created successfully!");
       }
       resetForm();
@@ -79,7 +76,7 @@ const CategoryList = () => {
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this category?")) {
       try {
-        await axios.delete(`http://localhost:3002/api/categories/${id}`);
+        await productService.deleteCategory(id);
         toast.success("Category deleted successfully!");
         fetchCategories();
       } catch (error) {

@@ -35,7 +35,12 @@ setInterval(() => {
 }, 30000);
 
 app.use(helmet());
-app.use(cors());
+
+// CORS only needed in development - gateway handles it in other environments
+if (process.env.NODE_ENV === 'development') {
+  app.use(cors());
+}
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

@@ -6,6 +6,10 @@ import Badge from "../../components/common/Badge";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
 import Table from "../../components/common/Table";
 import toast from "react-hot-toast";
+import { createApiClient } from "../../utils/axios";
+import { SERVICES } from "../../utils/constants";
+
+const inventoryApi = createApiClient(SERVICES.INVENTORY);
 
 const LowStockAlerts = () => {
   const [alerts, setAlerts] = useState([]);
@@ -21,23 +25,16 @@ const LowStockAlerts = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("token");
 
       const [alertsRes, suggestionsRes, statsRes] = await Promise.all([
-        fetch("http://localhost:3003/api/alerts?status=active", {
-          headers: { Authorization: `Bearer ${token}` },
-        }).then((r) => r.json()),
-        fetch("http://localhost:3003/api/alerts/reorder-suggestions", {
-          headers: { Authorization: `Bearer ${token}` },
-        }).then((r) => r.json()),
-        fetch("http://localhost:3003/api/alerts/stats", {
-          headers: { Authorization: `Bearer ${token}` },
-        }).then((r) => r.json()),
+        inventoryApi.get("/api/alerts?status=active"),
+        inventoryApi.get("/api/alerts/reorder-suggestions"),
+        inventoryApi.get("/api/alerts/stats"),
       ]);
 
-      setAlerts(alertsRes.data || []);
-      setSuggestions(suggestionsRes.data || []);
-      setStats(statsRes.data);
+      setAlerts(alertsRes.data.data || []);
+      setSuggestions(suggestionsRes.data.data || []);
+      setStats(statsRes.data.data);
     } catch (error) {
       console.error("Error fetching data:", error);
       toast.error("Failed to load alerts");
@@ -48,17 +45,8 @@ const LowStockAlerts = () => {
 
   const handleCheckStock = async () => {
     try {
-      const response = await fetch("http://localhost:3003/api/alerts/check", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
-
-      if (!response.ok) throw new Error("Failed to check stock");
-
-      const data = await response.json();
-      toast.success(data.message);
+      const response = await inventoryApi.post("/api/alerts/check");
+      toast.success(response.data.message);
       fetchData();
     } catch (error) {
       console.error("Error checking stock:", error);
@@ -68,18 +56,7 @@ const LowStockAlerts = () => {
 
   const handleResolveAlert = async (id) => {
     try {
-      const response = await fetch(
-        `http://localhost:3003/api/alerts/${id}/resolve`,
-        {
-          method: "PATCH",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
-
-      if (!response.ok) throw new Error("Failed to resolve alert");
-
+      await inventoryApi.patch(`/api/alerts/${id}/resolve`);
       toast.success("Alert resolved successfully");
       fetchData();
     } catch (error) {

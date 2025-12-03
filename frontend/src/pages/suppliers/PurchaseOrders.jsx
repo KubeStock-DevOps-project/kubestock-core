@@ -133,15 +133,8 @@ const PurchaseOrders = () => {
     try {
       // If marking as received, use the special endpoint that updates inventory
       if (newStatus === "received") {
-        await fetch(`http://localhost:3004/api/purchase-orders/${id}/receive`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: JSON.stringify({
-            notes: "Shipment received by warehouse",
-          }),
+        await supplierService.receivePurchaseOrder(id, {
+          notes: "Shipment received by warehouse",
         });
         toast.success("Order received! Inventory has been updated.");
       } else {

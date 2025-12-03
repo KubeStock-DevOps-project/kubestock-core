@@ -5,7 +5,11 @@ import Button from "../../components/common/Button";
 import Input from "../../components/common/Input";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
 import { productService } from "../../services/productService";
+import { createApiClient } from "../../utils/axios";
+import { SERVICES } from "../../utils/constants";
 import toast from "react-hot-toast";
+
+const productApi = createApiClient(SERVICES.PRODUCT);
 
 const ProductRatings = () => {
   const [products, setProducts] = useState([]);
@@ -23,15 +27,11 @@ const ProductRatings = () => {
       setLoading(true);
       const [productsRes, ratingsRes] = await Promise.all([
         productService.getAllProducts(),
-        fetch("http://localhost:3002/api/products/my-ratings", {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }).then((r) => r.json()),
+        productApi.get("/api/products/my-ratings"),
       ]);
 
       setProducts(productsRes.data || []);
-      setMyRatings(ratingsRes.data || []);
+      setMyRatings(ratingsRes.data?.data || []);
     } catch (error) {
       console.error("Error fetching data:", error);
       toast.error("Failed to load data");
@@ -43,19 +43,10 @@ const ProductRatings = () => {
   const handleRateProduct = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(
-        `http://localhost:3002/api/products/${ratingProduct.id}/rate`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: JSON.stringify(ratingData),
-        }
+      await productApi.post(
+        `/api/products/${ratingProduct.id}/rate`,
+        ratingData
       );
-
-      if (!response.ok) throw new Error("Failed to rate product");
 
       toast.success("Product rated successfully!");
       setRatingProduct(null);

@@ -57,11 +57,26 @@ export const supplierService = {
     return response.data;
   },
 
-  updatePurchaseOrderStatus: async (id, status, notes) => {
-    const response = await supplierApi.put(`${API_ENDPOINTS.PURCHASE_ORDERS}/${id}/status`, {
+  updatePurchaseOrder: async (id, orderData) => {
+    const response = await supplierApi.put(`${API_ENDPOINTS.PURCHASE_ORDERS}/${id}`, orderData);
+    return response.data;
+  },
+
+  deletePurchaseOrder: async (id) => {
+    const response = await supplierApi.delete(`${API_ENDPOINTS.PURCHASE_ORDERS}/${id}`);
+    return response.data;
+  },
+
+  updatePOStatus: async (id, status, notes) => {
+    const response = await supplierApi.patch(`${API_ENDPOINTS.PURCHASE_ORDERS}/${id}/status`, {
       status,
       notes,
     });
+    return response.data;
+  },
+
+  receivePurchaseOrder: async (id, data) => {
+    const response = await supplierApi.patch(`${API_ENDPOINTS.PURCHASE_ORDERS}/${id}/receive`, data);
     return response.data;
   },
 
