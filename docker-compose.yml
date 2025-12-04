@@ -51,12 +51,6 @@ services:
       NODE_ENV: development
       PORT: 3002
       DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/product_catalog_db
-      # Asgardeo Configuration
-      ASGARDEO_ORG_NAME: ${ASGARDEO_ORG_NAME:-kubestock}
-      ASGARDEO_CLIENT_ID: ${ASGARDEO_CLIENT_ID}
-      ASGARDEO_JWKS_URL: ${ASGARDEO_JWKS_URL:-https://api.asgardeo.io/t/kubestock/oauth2/jwks}
-      ASGARDEO_ISSUER: ${ASGARDEO_ISSUER:-https://api.asgardeo.io/t/kubestock/oauth2/token}
-      ASGARDEO_AUDIENCE: ${ASGARDEO_AUDIENCE}
       # Inter-service URLs
       INVENTORY_SERVICE_URL: http://ms-inventory:3003
     ports:
@@ -89,12 +83,6 @@ services:
       NODE_ENV: development
       PORT: 3003
       DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/inventory_db
-      # Asgardeo Configuration
-      ASGARDEO_ORG_NAME: ${ASGARDEO_ORG_NAME:-kubestock}
-      ASGARDEO_CLIENT_ID: ${ASGARDEO_CLIENT_ID}
-      ASGARDEO_JWKS_URL: ${ASGARDEO_JWKS_URL:-https://api.asgardeo.io/t/kubestock/oauth2/jwks}
-      ASGARDEO_ISSUER: ${ASGARDEO_ISSUER:-https://api.asgardeo.io/t/kubestock/oauth2/token}
-      ASGARDEO_AUDIENCE: ${ASGARDEO_AUDIENCE}
       # Inter-service URLs
       PRODUCT_CATALOG_SERVICE_URL: http://ms-product:3002
     ports:
@@ -129,12 +117,6 @@ services:
       NODE_ENV: development
       PORT: 3004
       DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/supplier_db
-      # Asgardeo Configuration
-      ASGARDEO_ORG_NAME: ${ASGARDEO_ORG_NAME:-kubestock}
-      ASGARDEO_CLIENT_ID: ${ASGARDEO_CLIENT_ID}
-      ASGARDEO_JWKS_URL: ${ASGARDEO_JWKS_URL:-https://api.asgardeo.io/t/kubestock/oauth2/jwks}
-      ASGARDEO_ISSUER: ${ASGARDEO_ISSUER:-https://api.asgardeo.io/t/kubestock/oauth2/token}
-      ASGARDEO_AUDIENCE: ${ASGARDEO_AUDIENCE}
       # Inter-service URLs
       PRODUCT_CATALOG_SERVICE_URL: http://ms-product:3002
       INVENTORY_SERVICE_URL: http://ms-inventory:3003
@@ -172,12 +154,6 @@ services:
       NODE_ENV: development
       PORT: 3005
       DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/order_db
-      # Asgardeo Configuration
-      ASGARDEO_ORG_NAME: ${ASGARDEO_ORG_NAME:-kubestock}
-      ASGARDEO_CLIENT_ID: ${ASGARDEO_CLIENT_ID}
-      ASGARDEO_JWKS_URL: ${ASGARDEO_JWKS_URL:-https://api.asgardeo.io/t/kubestock/oauth2/jwks}
-      ASGARDEO_ISSUER: ${ASGARDEO_ISSUER:-https://api.asgardeo.io/t/kubestock/oauth2/token}
-      ASGARDEO_AUDIENCE: ${ASGARDEO_AUDIENCE}
       # Inter-service URLs
       PRODUCT_CATALOG_SERVICE_URL: http://ms-product:3002
       INVENTORY_SERVICE_URL: http://ms-inventory:3003
