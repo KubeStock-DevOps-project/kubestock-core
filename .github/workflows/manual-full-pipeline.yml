@@ -207,8 +207,8 @@ jobs:
         env:
           DATABASE_URL: postgresql://kubestock:kubestock_dev@localhost:5432/kubestock_test
         run: |
-          if [ -f "package.json" ] && grep -q '"migrate"' package.json; then
-            npm run migrate
+          if [ -f "package.json" ] && grep -q '"migrate:up"' package.json; then
+            npm run migrate:up
           fi
       
       - name: Run integration tests
