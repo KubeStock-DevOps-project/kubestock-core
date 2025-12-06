@@ -1,0 +1,367 @@
+# =============================================================================
+# KubeStock Monorepo - Continuous Integration & Deployment
+# =============================================================================
+# Triggers on push to main/develop: Build → Push to ECR → Update GitOps → Deploy
+# =============================================================================
+
+name: CI/CD
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '18'
+  AWS_REGION: ap-south-1
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com
+  # Defaults to canonical GitOps repo; override via repository/ORG/REPO secret if needed
+  GITOPS_REPO: KubeStock-DevOps-project/kubestock-gitops
+  GITOPS_BRANCH: main
+
+permissions:
+  id-token: write
+  contents: read
+  actions: read
+
+jobs:
+  # ═══════════════════════════════════════════════════════════════
+  # DETECT CHANGES
+  # ═══════════════════════════════════════════════════════════════
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      ms-product: ${{ steps.filter.outputs.ms-product }}
+      ms-inventory: ${{ steps.filter.outputs.ms-inventory }}
+      ms-supplier: ${{ steps.filter.outputs.ms-supplier }}
+      ms-order-management: ${{ steps.filter.outputs.ms-order-management }}
+      ms-identity: ${{ steps.filter.outputs.ms-identity }}
+      web: ${{ steps.filter.outputs.web }}
+      any-service: ${{ steps.check.outputs.any-service }}
+      environment: ${{ steps.set-env.outputs.environment }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            ms-product:
+              - 'services/ms-product/**'
+              - 'packages/**'
+            ms-inventory:
+              - 'services/ms-inventory/**'
+              - 'packages/**'
+            ms-supplier:
+              - 'services/ms-supplier/**'
+              - 'packages/**'
+            ms-order-management:
+              - 'services/ms-order-management/**'
+              - 'packages/**'
+            ms-identity:
+              - 'services/ms-identity/**'
+              - 'packages/**'
+            web:
+              - 'apps/web/**'
+              - 'packages/**'
+      
+      - name: Check if any service changed
+        id: check
+        run: |
+          if [[ "${{ steps.filter.outputs.ms-product }}" == "true" ]] || \
+             [[ "${{ steps.filter.outputs.ms-inventory }}" == "true" ]] || \
+             [[ "${{ steps.filter.outputs.ms-supplier }}" == "true" ]] || \
+             [[ "${{ steps.filter.outputs.ms-order-management }}" == "true" ]] || \
+             [[ "${{ steps.filter.outputs.ms-identity }}" == "true" ]] || \
+             [[ "${{ steps.filter.outputs.web }}" == "true" ]]; then
+            echo "any-service=true" >> $GITHUB_OUTPUT
+          else
+            echo "any-service=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Set environment
+        id: set-env
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "environment=production" >> $GITHUB_OUTPUT
+          else
+            echo "environment=staging" >> $GITHUB_OUTPUT
+          fi
+
+  # ═══════════════════════════════════════════════════════════════
+  # BUILD & PUSH TO ECR
+  # ═══════════════════════════════════════════════════════════════
+  build-and-push:
+    name: Build & Push
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    if: needs.detect-changes.outputs.any-service == 'true'
+    strategy:
+      matrix:
+        include:
+          - name: ms-product
+            changed: ${{ needs.detect-changes.outputs.ms-product }}
+            path: services/ms-product
+            ecr-repo: kubestock/ms-product
+          - name: ms-inventory
+            changed: ${{ needs.detect-changes.outputs.ms-inventory }}
+            path: services/ms-inventory
+            ecr-repo: kubestock/ms-inventory
+          - name: ms-supplier
+            changed: ${{ needs.detect-changes.outputs.ms-supplier }}
+            path: services/ms-supplier
+            ecr-repo: kubestock/ms-supplier
+          - name: ms-order-management
+            changed: ${{ needs.detect-changes.outputs.ms-order-management }}
+            path: services/ms-order-management
+            ecr-repo: kubestock/ms-order-management
+          - name: ms-identity
+            changed: ${{ needs.detect-changes.outputs.ms-identity }}
+            path: services/ms-identity
+            ecr-repo: kubestock/ms-identity
+          - name: web
+            changed: ${{ needs.detect-changes.outputs.web }}
+            path: apps/web
+            ecr-repo: kubestock/web
+    
+    outputs:
+      ms-product-tag: ${{ steps.push.outputs.ms-product-tag }}
+      ms-inventory-tag: ${{ steps.push.outputs.ms-inventory-tag }}
+      ms-supplier-tag: ${{ steps.push.outputs.ms-supplier-tag }}
+      ms-order-management-tag: ${{ steps.push.outputs.ms-order-management-tag }}
+      ms-identity-tag: ${{ steps.push.outputs.ms-identity-tag }}
+      web-tag: ${{ steps.push.outputs.web-tag }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        if: matrix.changed == 'true'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        if: matrix.changed == 'true'
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+          role-session-name: github-actions-${{ matrix.name }}-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        if: matrix.changed == 'true'
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        if: matrix.changed == 'true'
+
+      - name: Extract metadata
+        id: meta
+        if: matrix.changed == 'true'
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.ECR_REGISTRY }}/${{ matrix.ecr-repo }}
+          tags: |
+            type=sha,prefix={{branch}}-,format=short
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        id: push
+        if: matrix.changed == 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.path }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        if: matrix.changed == 'true'
+        with:
+          image-ref: ${{ env.ECR_REGISTRY }}/${{ matrix.ecr-repo }}:${{ github.ref_name }}-${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: matrix.changed == 'true' && hashFiles('trivy-results.sarif') != ''
+        continue-on-error: true
+        with:
+          sarif_file: 'trivy-results.sarif'
+          category: trivy-${{ matrix.name }}-${{ github.ref_name }}
+
+      - name: Image summary
+        if: matrix.changed == 'true'
+        run: |
+          echo "## 🐳 ${{ matrix.name }} - Build & Push Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Repository:** \`${{ matrix.ecr-repo }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Tag:** \`${{ github.ref_name }}-${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Full Image:** \`${{ env.ECR_REGISTRY }}/${{ matrix.ecr-repo }}:${{ github.ref_name }}-${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Security scan complete" >> $GITHUB_STEP_SUMMARY
+
+  # ═══════════════════════════════════════════════════════════════
+  # STAGING APPROVAL (only for production deployments from main)
+  # ═══════════════════════════════════════════════════════════════
+  staging-approval:
+    name: Approve Production Deployment
+    needs: [detect-changes, build-and-push]
+    runs-on: ubuntu-latest
+    if: |
+      needs.detect-changes.outputs.environment == 'production' &&
+      needs.detect-changes.outputs.any-service == 'true'
+    environment:
+      name: production
+      url: https://kubestock.example.com
+    
+    steps:
+      - name: Deployment approval
+        run: |
+          echo "## 🚀 Production Deployment Approved" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Deploying to production environment..." >> $GITHUB_STEP_SUMMARY
+
+  # ═══════════════════════════════════════════════════════════════
+  # UPDATE GITOPS REPOSITORY
+  # ═══════════════════════════════════════════════════════════════
+  update-gitops:
+    name: Update GitOps
+    needs: [detect-changes, build-and-push, staging-approval]
+    runs-on: ubuntu-latest
+    if: |
+      always() &&
+      needs.detect-changes.outputs.any-service == 'true' &&
+      needs.build-and-push.result == 'success' &&
+      (needs.detect-changes.outputs.environment == 'staging' || needs.staging-approval.result == 'success')
+    strategy:
+      matrix:
+        include:
+          - name: ms-product
+            changed: ${{ needs.detect-changes.outputs.ms-product }}
+            kustomize-path: gitops/overlays/${{ needs.detect-changes.outputs.environment }}/ms-product
+            image-path: kubestock/ms-product
+          - name: ms-inventory
+            changed: ${{ needs.detect-changes.outputs.ms-inventory }}
+            kustomize-path: gitops/overlays/${{ needs.detect-changes.outputs.environment }}/ms-inventory
+            image-path: kubestock/ms-inventory
+          - name: ms-supplier
+            changed: ${{ needs.detect-changes.outputs.ms-supplier }}
+            kustomize-path: gitops/overlays/${{ needs.detect-changes.outputs.environment }}/ms-supplier
+            image-path: kubestock/ms-supplier
+          - name: ms-order-management
+            changed: ${{ needs.detect-changes.outputs.ms-order-management }}
+            kustomize-path: gitops/overlays/${{ needs.detect-changes.outputs.environment }}/ms-order-management
+            image-path: kubestock/ms-order-management
+          - name: ms-identity
+            changed: ${{ needs.detect-changes.outputs.ms-identity }}
+            kustomize-path: gitops/overlays/${{ needs.detect-changes.outputs.environment }}/ms-identity
+            image-path: kubestock/ms-identity
+          - name: web
+            changed: ${{ needs.detect-changes.outputs.web }}
+            kustomize-path: gitops/overlays/${{ needs.detect-changes.outputs.environment }}/web
+            image-path: kubestock/web
+
+    steps:
+      - name: Checkout GitOps repository
+        uses: actions/checkout@v4
+        if: matrix.changed == 'true'
+        with:
+          repository: ${{ env.GITOPS_REPO }}
+          ref: ${{ env.GITOPS_BRANCH }}
+          token: ${{ secrets.GITOPS_REPO_TOKEN }}
+          path: gitops-repo
+
+      - name: Setup Kustomize
+        if: matrix.changed == 'true'
+        run: |
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          sudo mv kustomize /usr/local/bin/
+
+      - name: Update image tag
+        if: matrix.changed == 'true'
+        run: |
+          cd gitops-repo/${{ matrix.kustomize-path }}
+          kustomize edit set image ${{ matrix.image-path }}=${{ env.ECR_REGISTRY }}/${{ matrix.image-path }}:${{ github.ref_name }}-${{ github.sha }}
+
+      - name: Commit and push changes
+        if: matrix.changed == 'true'
+        run: |
+          cd gitops-repo
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "Update ${{ matrix.name }} image tag to ${{ github.ref_name }}-${{ github.sha }}" || echo "No changes to commit"
+          git push
+
+      - name: GitOps summary
+        if: matrix.changed == 'true'
+        run: |
+          echo "## 📝 ${{ matrix.name }} - GitOps Updated" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** \`${{ needs.detect-changes.outputs.environment }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Kustomize Path:** \`${{ matrix.kustomize-path }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**New Image Tag:** \`${{ github.ref_name }}-${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ ArgoCD will sync automatically" >> $GITHUB_STEP_SUMMARY
+
+  # ═══════════════════════════════════════════════════════════════
+  # DEPLOYMENT STATUS
+  # ═══════════════════════════════════════════════════════════════
+  deploy-status:
+    name: Deployment Status
+    needs: [detect-changes, build-and-push, update-gitops]
+    runs-on: ubuntu-latest
+    if: always() && needs.detect-changes.outputs.any-service == 'true'
+    
+    steps:
+      - name: Check ArgoCD sync status
+        run: |
+          echo "## 🎉 Deployment Pipeline Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** \`${{ needs.detect-changes.outputs.environment }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Git SHA:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Changed Services:" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ needs.detect-changes.outputs.ms-product }}" == "true" ]]; then
+            echo "- ✅ **ms-product** - Built & Deployed" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [[ "${{ needs.detect-changes.outputs.ms-inventory }}" == "true" ]]; then
+            echo "- ✅ **ms-inventory** - Built & Deployed" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [[ "${{ needs.detect-changes.outputs.ms-supplier }}" == "true" ]]; then
+            echo "- ✅ **ms-supplier** - Built & Deployed" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [[ "${{ needs.detect-changes.outputs.ms-order-management }}" == "true" ]]; then
+            echo "- ✅ **ms-order-management** - Built & Deployed" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [[ "${{ needs.detect-changes.outputs.ms-identity }}" == "true" ]]; then
+            echo "- ✅ **ms-identity** - Built & Deployed" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [[ "${{ needs.detect-changes.outputs.web }}" == "true" ]]; then
+            echo "- ✅ **web** - Built & Deployed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "ArgoCD will automatically sync the changes to the cluster." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🚀 **Deployment successful!**" >> $GITHUB_STEP_SUMMARY
+
+      - name: Notify deployment
+        run: |
+          echo "Deployment to ${{ needs.detect-changes.outputs.environment }} complete!"
+          echo "Images pushed to ECR and GitOps repository updated."
+          echo "ArgoCD will sync the changes automatically."

@@ -1,15 +1,15 @@
 # =============================================================================
-# KubeStock - Local Development Docker Compose
+# KubeStock - Local Development Docker Compose (Monorepo)
 # =============================================================================
-# This docker-compose uses git submodules from the modules/ directory
-# to build and run all microservices for local development/testing.
+# This docker-compose uses the monorepo structure with services/ and apps/
+# directories to build and run all microservices for local development/testing.
 #
 # Usage:
-#   1. Initialize submodules: git submodule update --init --recursive
+#   1. Install dependencies: npm install
 #   2. Copy .env.example to .env and configure secrets
-#   3. Start all services: docker compose up -d
-#   4. View logs: docker compose logs -f
-#   5. Stop all: docker compose down
+#   3. Start all services: docker compose up -d (or npm run docker:up)
+#   4. View logs: docker compose logs -f (or npm run docker:logs)
+#   5. Stop all: docker compose down (or npm run docker:down)
 #   6. Clean reset: docker compose down -v
 # =============================================================================
 
@@ -43,7 +43,7 @@ services:
   # ─────────────────────────────────────────────────────────────────
   ms-product:
     build:
-      context: ./modules/ms-product
+      context: ./services/ms-product
       dockerfile: Dockerfile
     container_name: ms-product
     restart: unless-stopped
@@ -65,8 +65,8 @@ services:
     networks:
       - kubestock-network
     volumes:
-      - ./modules/ms-product/src:/app/src:ro
-      - ./modules/ms-product/migrations:/app/migrations:ro
+      - ./services/ms-product/src:/app/src:ro
+      - ./services/ms-product/migrations:/app/migrations:ro
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3002/health"]
       interval: 30s
@@ -79,7 +79,7 @@ services:
   # ─────────────────────────────────────────────────────────────────
   ms-inventory:
     build:
-      context: ./modules/ms-inventory
+      context: ./services/ms-inventory
       dockerfile: Dockerfile
     container_name: ms-inventory
     restart: unless-stopped
@@ -104,8 +104,8 @@ services:
     networks:
       - kubestock-network
     volumes:
-      - ./modules/ms-inventory/src:/app/src:ro
-      - ./modules/ms-inventory/migrations:/app/migrations:ro
+      - ./services/ms-inventory/src:/app/src:ro
+      - ./services/ms-inventory/migrations:/app/migrations:ro
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3003/health"]
       interval: 30s
@@ -118,7 +118,7 @@ services:
   # ─────────────────────────────────────────────────────────────────
   ms-supplier:
     build:
-      context: ./modules/ms-supplier
+      context: ./services/ms-supplier
       dockerfile: Dockerfile
     container_name: ms-supplier
     restart: unless-stopped
@@ -146,8 +146,8 @@ services:
     networks:
       - kubestock-network
     volumes:
-      - ./modules/ms-supplier/src:/app/src:ro
-      - ./modules/ms-supplier/migrations:/app/migrations:ro
+      - ./services/ms-supplier/src:/app/src:ro
+      - ./services/ms-supplier/migrations:/app/migrations:ro
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3004/health"]
       interval: 30s
@@ -160,7 +160,7 @@ services:
   # ─────────────────────────────────────────────────────────────────
   ms-order-management:
     build:
-      context: ./modules/ms-order-management
+      context: ./services/ms-order-management
       dockerfile: Dockerfile
     container_name: ms-order-management
     restart: unless-stopped
@@ -188,8 +188,8 @@ services:
     networks:
       - kubestock-network
     volumes:
-      - ./modules/ms-order-management/src:/app/src:ro
-      - ./modules/ms-order-management/migrations:/app/migrations:ro
+      - ./services/ms-order-management/src:/app/src:ro
+      - ./services/ms-order-management/migrations:/app/migrations:ro
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3005/health"]
       interval: 30s
@@ -202,7 +202,7 @@ services:
   # ─────────────────────────────────────────────────────────────────
   ms-identity:
     build:
-      context: ./modules/ms-identity
+      context: ./services/ms-identity
       dockerfile: Dockerfile
     container_name: ms-identity
     restart: unless-stopped
@@ -228,7 +228,7 @@ services:
     networks:
       - kubestock-network
     volumes:
-      - ./modules/ms-identity/src:/app/src:ro
+      - ./services/ms-identity/src:/app/src:ro
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3006/health"]
       interval: 30s
@@ -241,7 +241,7 @@ services:
   # ─────────────────────────────────────────────────────────────────
   frontend:
     build:
-      context: ./frontend
+      context: ./apps/web
       dockerfile: Dockerfile
       args:
         VITE_API_GATEWAY_URL: ""

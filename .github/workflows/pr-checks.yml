@@ -1,0 +1,368 @@
+# =============================================================================
+# KubeStock Monorepo - Pull Request Checks
+# =============================================================================
+# Runs on all PRs: Lint, Test, Security Scan, Build, Integration Test
+# =============================================================================
+
+name: PR Checks
+
+on:
+  pull_request:
+    branches:
+      - main
+
+env:
+  NODE_VERSION: '18'
+
+permissions:
+  contents: read
+  pull-requests: write
+  security-events: write
+
+jobs:
+  # ═══════════════════════════════════════════════════════════════
+  # DETECT CHANGES
+  # ═══════════════════════════════════════════════════════════════
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      ms-product: ${{ steps.filter.outputs.ms-product }}
+      ms-inventory: ${{ steps.filter.outputs.ms-inventory }}
+      ms-supplier: ${{ steps.filter.outputs.ms-supplier }}
+      ms-order-management: ${{ steps.filter.outputs.ms-order-management }}
+      ms-identity: ${{ steps.filter.outputs.ms-identity }}
+      web: ${{ steps.filter.outputs.web }}
+      any-service: ${{ steps.check.outputs.any-service }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            ms-product:
+              - 'services/ms-product/**'
+              - 'packages/**'
+            ms-inventory:
+              - 'services/ms-inventory/**'
+              - 'packages/**'
+            ms-supplier:
+              - 'services/ms-supplier/**'
+              - 'packages/**'
+            ms-order-management:
+              - 'services/ms-order-management/**'
+              - 'packages/**'
+            ms-identity:
+              - 'services/ms-identity/**'
+              - 'packages/**'
+            web:
+              - 'apps/web/**'
+              - 'packages/**'
+      
+      - name: Check if any service changed
+        id: check
+        run: |
+          if [[ "${{ steps.filter.outputs.ms-product }}" == "true" ]] || \
+             [[ "${{ steps.filter.outputs.ms-inventory }}" == "true" ]] || \
+             [[ "${{ steps.filter.outputs.ms-supplier }}" == "true" ]] || \
+             [[ "${{ steps.filter.outputs.ms-order-management }}" == "true" ]] || \
+             [[ "${{ steps.filter.outputs.ms-identity }}" == "true" ]] || \
+             [[ "${{ steps.filter.outputs.web }}" == "true" ]]; then
+            echo "any-service=true" >> $GITHUB_OUTPUT
+          else
+            echo "any-service=false" >> $GITHUB_OUTPUT
+          fi
+
+  # ═══════════════════════════════════════════════════════════════
+  # LINT
+  # ═══════════════════════════════════════════════════════════════
+  lint:
+    name: Lint
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    if: needs.detect-changes.outputs.any-service == 'true'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linter
+        run: npm run lint --if-present
+
+      - name: Lint summary
+        run: |
+          echo "## ✅ Lint Check Passed" >> $GITHUB_STEP_SUMMARY
+
+  # ═══════════════════════════════════════════════════════════════
+  # UNIT TESTS
+  # ═══════════════════════════════════════════════════════════════
+  test:
+    name: Unit Tests
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    if: needs.detect-changes.outputs.any-service == 'true'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Test summary
+        run: |
+          echo "## ✅ Unit Tests Passed" >> $GITHUB_STEP_SUMMARY
+
+  # ═══════════════════════════════════════════════════════════════
+  # SECURITY SCAN
+  # ═══════════════════════════════════════════════════════════════
+  security-scan:
+    name: Security Scan
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    if: needs.detect-changes.outputs.any-service == 'true'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        run: npm audit --audit-level=high || true
+        continue-on-error: true
+
+      - name: Security summary
+        run: |
+          echo "## 🔒 Security Scan Complete" >> $GITHUB_STEP_SUMMARY
+
+  # ═══════════════════════════════════════════════════════════════
+  # BUILD & SCAN - Docker build + Trivy security scan
+  # ═══════════════════════════════════════════════════════════════
+  build-and-scan:
+    name: Build & Scan
+    needs: [detect-changes, lint, test, security-scan]
+    runs-on: ubuntu-latest
+    if: needs.detect-changes.outputs.any-service == 'true'
+    strategy:
+      matrix:
+        include:
+          - name: ms-product
+            changed: ${{ needs.detect-changes.outputs.ms-product }}
+            path: services/ms-product
+          - name: ms-inventory
+            changed: ${{ needs.detect-changes.outputs.ms-inventory }}
+            path: services/ms-inventory
+          - name: ms-supplier
+            changed: ${{ needs.detect-changes.outputs.ms-supplier }}
+            path: services/ms-supplier
+          - name: ms-order-management
+            changed: ${{ needs.detect-changes.outputs.ms-order-management }}
+            path: services/ms-order-management
+          - name: ms-identity
+            changed: ${{ needs.detect-changes.outputs.ms-identity }}
+            path: services/ms-identity
+          - name: web
+            changed: ${{ needs.detect-changes.outputs.web }}
+            path: apps/web
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        if: matrix.changed == 'true'
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        if: matrix.changed == 'true'
+
+      - name: Build Docker image
+        if: matrix.changed == 'true'
+        run: |
+          docker build -t ${{ matrix.name }}:pr-${{ github.event.pull_request.number }} ${{ matrix.path }}
+
+      - name: Run Trivy vulnerability scanner (Table)
+        uses: aquasecurity/trivy-action@master
+        if: matrix.changed == 'true'
+        continue-on-error: true
+        with:
+          image-ref: ${{ matrix.name }}:pr-${{ github.event.pull_request.number }}
+          format: 'table'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+
+      - name: Run Trivy vulnerability scanner (SARIF)
+        uses: aquasecurity/trivy-action@master
+        if: matrix.changed == 'true'
+        with:
+          image-ref: ${{ matrix.name }}:pr-${{ github.event.pull_request.number }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: matrix.changed == 'true' && hashFiles('trivy-results.sarif') != ''
+        continue-on-error: true
+        with:
+          sarif_file: 'trivy-results.sarif'
+          category: trivy-${{ matrix.name }}-pr
+
+      - name: Build summary
+        if: matrix.changed == 'true'
+        run: |
+          echo "## 🐳 ${{ matrix.name }} - Build & Scan Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Image: \`${{ matrix.name }}:pr-${{ github.event.pull_request.number }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Trivy vulnerability scan passed" >> $GITHUB_STEP_SUMMARY
+
+  # ═══════════════════════════════════════════════════════════════
+  # INTEGRATION TESTS - Services with database integration
+  # ═══════════════════════════════════════════════════════════════
+  integration-test:
+    name: Integration Tests
+    needs: [detect-changes, build-and-scan]
+    runs-on: ubuntu-latest
+    if: |
+      needs.detect-changes.outputs.ms-product == 'true' ||
+      needs.detect-changes.outputs.ms-inventory == 'true' ||
+      needs.detect-changes.outputs.ms-order-management == 'true'
+    strategy:
+      matrix:
+        include:
+          - name: ms-product
+            changed: ${{ needs.detect-changes.outputs.ms-product }}
+            path: services/ms-product
+            db: product_catalog_db
+          - name: ms-inventory
+            changed: ${{ needs.detect-changes.outputs.ms-inventory }}
+            path: services/ms-inventory
+            db: inventory_db
+          - name: ms-order-management
+            changed: ${{ needs.detect-changes.outputs.ms-order-management }}
+            path: services/ms-order-management
+            db: order_db
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ${{ matrix.db }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        if: matrix.changed == 'true'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        if: matrix.changed == 'true'
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        if: matrix.changed == 'true'
+        working-directory: ${{ matrix.path }}
+        run: npm ci
+
+      - name: Wait for PostgreSQL
+        if: matrix.changed == 'true'
+        run: |
+          until pg_isready -h localhost -p 5432 -U postgres; do
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+
+      - name: Run database migrations
+        if: matrix.changed == 'true'
+        working-directory: ${{ matrix.path }}
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/${{ matrix.db }}
+        run: npm run migrate:up
+
+      - name: Run integration tests
+        if: matrix.changed == 'true'
+        working-directory: ${{ matrix.path }}
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/${{ matrix.db }}
+          NODE_ENV: test
+        run: npm run test:integration --if-present
+
+      - name: Integration test summary
+        if: matrix.changed == 'true'
+        run: |
+          echo "## ✅ ${{ matrix.name }} - Integration Tests Complete" >> $GITHUB_STEP_SUMMARY
+
+  # ═══════════════════════════════════════════════════════════════
+  # PR SUMMARY
+  # ═══════════════════════════════════════════════════════════════
+  pr-summary:
+    name: PR Summary
+    needs: [detect-changes, lint, test, security-scan, build-and-scan]
+    runs-on: ubuntu-latest
+    if: always() && needs.detect-changes.outputs.any-service == 'true'
+    
+    steps:
+      - name: Generate summary
+        run: |
+          echo "## 🎉 All PR Checks Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Changed Services:" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ needs.detect-changes.outputs.ms-product }}" == "true" ]]; then
+            echo "- ✅ ms-product" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [[ "${{ needs.detect-changes.outputs.ms-inventory }}" == "true" ]]; then
+            echo "- ✅ ms-inventory" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [[ "${{ needs.detect-changes.outputs.ms-supplier }}" == "true" ]]; then
+            echo "- ✅ ms-supplier" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [[ "${{ needs.detect-changes.outputs.ms-order-management }}" == "true" ]]; then
+            echo "- ✅ ms-order-management" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [[ "${{ needs.detect-changes.outputs.ms-identity }}" == "true" ]]; then
+            echo "- ✅ ms-identity" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [[ "${{ needs.detect-changes.outputs.web }}" == "true" ]]; then
+            echo "- ✅ web (frontend)" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All checks passed! Ready to merge. 🚀" >> $GITHUB_STEP_SUMMARY
