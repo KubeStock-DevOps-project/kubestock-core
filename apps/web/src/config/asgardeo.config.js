@@ -35,9 +35,8 @@ const baseUrl = getConfig('VITE_ASGARDEO_BASE_URL', "https://api.asgardeo.io/t/k
 const orgName = getConfig('VITE_ASGARDEO_ORG_NAME', "kubestock");
 const clientID = getConfig('VITE_ASGARDEO_CLIENT_ID', "");
 
-// Use current origin as default redirect URL - works for both localhost and production
-const currentOrigin = typeof window !== 'undefined' ? window.location.origin : "http://localhost:5173";
-const redirectURL = getConfig('VITE_APP_URL') || currentOrigin;
+// Always use current origin as redirect URL - works for both localhost and production
+const redirectURL = typeof window !== 'undefined' ? window.location.origin : "http://localhost:5173";
 
 // Construct baseUrl from org name if not explicitly set
 const effectiveBaseUrl = baseUrl || `https://api.asgardeo.io/t/${orgName}`;

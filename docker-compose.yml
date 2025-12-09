@@ -244,7 +244,7 @@ services:
       context: ./apps/web
       dockerfile: Dockerfile
       args:
-        VITE_API_GATEWAY_URL: ""
+
         VITE_ASGARDEO_CLIENT_ID: ${ASGARDEO_SPA_CLIENT_ID}
         VITE_ASGARDEO_ORG_NAME: ${ASGARDEO_ORG_NAME:-kubestock}
     container_name: kubestock-frontend

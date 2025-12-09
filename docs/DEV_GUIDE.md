@@ -104,7 +104,7 @@ Front-end authentication:
 Important: The system uses single-origin policy in production. For local development, follow these steps to avoid CORS and to run a single microservice locally while keeping the gateway and other services in Docker Compose.
 
 1. Environment variable for local dev
-   - Keep `VITE_API_GATEWAY_URL` empty for normal local development. If you set it to a custom gateway URL you may encounter CORS unless the gateway mirrors production behavior.
+   - No frontend environment variables needed. The app automatically uses relative paths (same-origin) for all API calls.
 
 2. Start required Docker services
    - Start only Postgres first (to initialize DBs). Example:
@@ -132,7 +132,7 @@ Important: The system uses single-origin policy in production. For local develop
 
 Notes:
 - The gateway configuration intentionally routes outward to host.docker.internal to enable local host development. Ensure your local dev server binds to 0.0.0.0 or host.docker.internal-accessible interface and the expected port.
-- If you see CORS errors while doing local debugging, double-check `VITE_API_GATEWAY_URL` and the gateway bindings.
+- If you see CORS errors while doing local debugging, verify that all API calls are going through the gateway using relative paths.
 
 ---
 

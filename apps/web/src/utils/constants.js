@@ -1,8 +1,7 @@
 /**
  * API Configuration
  * 
- * All API calls go through the API Gateway.
- * The gateway base URL can be configured via VITE_API_GATEWAY_URL environment variable.
+ * All API calls go through the API Gateway using relative paths (same-origin).
  * 
  * Usage:
  *   import { API } from '../utils/constants';
@@ -11,8 +10,8 @@
  *   axios.get(API.inventory.alerts());
  */
 
-// API Gateway base URL - defaults to relative path for same-origin deployment
-const API_GATEWAY_URL = import.meta.env.VITE_API_GATEWAY_URL || '';
+// Always use relative paths - all API calls are same-origin
+const API_GATEWAY_URL = '';
 
 // Service prefixes on the gateway
 const SERVICE_PREFIXES = {

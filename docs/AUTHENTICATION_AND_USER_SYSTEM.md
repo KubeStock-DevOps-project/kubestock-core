@@ -185,8 +185,9 @@ module.exports = {
 export const asgardeoConfig = {
   baseUrl: import.meta.env.VITE_ASGARDEO_BASE_URL,
   clientID: import.meta.env.VITE_ASGARDEO_CLIENT_ID,
-  signInRedirectURL: import.meta.env.VITE_APP_URL || "http://localhost:5173",
-  signOutRedirectURL: import.meta.env.VITE_APP_URL || "http://localhost:5173",
+  // Always uses window.location.origin - adapts to any environment automatically
+  signInRedirectURL: window.location.origin,
+  signOutRedirectURL: window.location.origin,
   scope: ["openid", "profile", "email", "groups"],
   enablePKCE: true,
   responseMode: "query",
