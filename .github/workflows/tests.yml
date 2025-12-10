@@ -61,8 +61,6 @@ jobs:
         run: |
           echo "Running Smoke Test against $BASE_URL..."
           k6 run tests/k6/smoke.js -e BASE_URL=$BASE_URL
-        # Note: Mapping PRODUCT_SERVICE_URL to BASE_URL assuming they are accessible via the same gateway/ingress in staging/prod.
-        # If internal services are not exposed, this might need adjustment or reliance on internal k8s networking (which is harder from external GHA runner).
 
       - name: Run Load Test
         run: |
