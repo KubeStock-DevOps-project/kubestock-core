@@ -40,6 +40,17 @@ app.use(helmet());
 app.use(express.json());
 app.use(metricsMiddleware);
 
+// Request logging middleware
+app.use((req, res, next) => {
+  if (req.path !== "/health") {
+    logger.info(`${req.method} ${req.path}`, {
+      ip: req.ip,
+      userAgent: req.get("user-agent"),
+    });
+  }
+  next();
+});
+
 // Health check
 app.get("/health", (req, res) => {
   res.status(200).json({
