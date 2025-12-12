@@ -28,7 +28,7 @@ const params = {
 
 export default function () {
     // 1. Check Product Service
-    const productUrl = __ENV.PRODUCT_URL || `${BASE_URL}/api/products`;
+    const productUrl = __ENV.PRODUCT_URL || `${BASE_URL}/api/product`;
     const resProduct = http.get(productUrl, params);
     check(resProduct, {
         '✅ Product Service UP': (r) => r.status === 200,
@@ -49,7 +49,7 @@ export default function () {
     }
 
     // 3. Check Supplier Service
-    const supplierUrl = __ENV.SUPPLIER_URL || `${BASE_URL}/api/suppliers`;
+    const supplierUrl = __ENV.SUPPLIER_URL || `${BASE_URL}/api/supplier`;
     const resSupplier = http.get(supplierUrl, params);
     check(resSupplier, {
         '✅ Supplier Service UP': (r) => r.status === 200,
@@ -59,7 +59,7 @@ export default function () {
     }
 
     // 4. Check Order Management Service
-    const orderUrl = __ENV.ORDER_URL || `${BASE_URL}/api/orders`;
+    const orderUrl = __ENV.ORDER_URL || `${BASE_URL}/api/order`;
     const resOrder = http.get(orderUrl, params);
     check(resOrder, {
         '✅ Order Service UP': (r) => r.status === 200,
