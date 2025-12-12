@@ -23,7 +23,6 @@ const AdminDashboard = () => {
     totalProducts: 0,
     totalInventory: 0,
     lowStockItems: 0,
-    totalUsers: 0,
     totalOrders: 0,
     pendingOrders: 0,
     totalRevenue: 0,
@@ -47,7 +46,7 @@ const AdminDashboard = () => {
             .getStockMovements({ limit: 30 })
             .catch(() => ({ data: [] })),
           orderService.getOrderStats().catch(() => ({ data: null })),
-          identityService.listSuppliers().catch(() => ({ data: { data: [] } })),
+          identityService.listSuppliers().catch(() => ({ data: [] })),
         ]);
 
       // Calculate stats
@@ -62,7 +61,7 @@ const AdminDashboard = () => {
         totalOrders: orderData.total || 0,
         pendingOrders: orderData.pending || 0,
         totalRevenue: orderData.totalRevenue || 0,
-        totalSuppliers: suppliers?.data?.data?.length || 0,
+        totalSuppliers: suppliers?.data?.length || 0,
       });
 
       // Process stock movements for chart (group by date)
@@ -133,15 +132,16 @@ const AdminDashboard = () => {
       if (movements.data && movements.data.length > 0) {
         // Get unique product IDs from movements
         const productIds = [
-          ...new Set(movements.data.map((m) => m.product_id)),
+          ...new Set(movements.data.map((m) => m.product_id).filter(Boolean)),
         ];
 
         // Fetch product names
         let productMap = {};
         try {
-          const productsResponse = await productService.getProductsByIds(
-            productIds
-          );
+          const productsResponse =
+            productIds.length > 0
+              ? await productService.getProductsByIds(productIds)
+              : { data: [] };
           if (productsResponse.data) {
             productMap = productsResponse.data.reduce((acc, p) => {
               acc[p.id] = p.name;
@@ -149,7 +149,7 @@ const AdminDashboard = () => {
             }, {});
           }
         } catch (error) {
-          console.log("Could not fetch product names for activities", error);
+          console.error("Could not fetch product names for activities:", error);
         }
 
         setRecentActivities(
@@ -257,7 +257,7 @@ const AdminDashboard = () => {
             <div>
               <p className="text-sm text-dark-600">Revenue (Delivered)</p>
               <h3 className="text-2xl font-bold text-dark-900 mt-1">
-                ${stats.totalRevenue.toFixed(2)}
+                ${(Number(stats.totalRevenue) || 0).toFixed(2)}
               </h3>
             </div>
             <TrendingUp size={32} className="text-primary" />

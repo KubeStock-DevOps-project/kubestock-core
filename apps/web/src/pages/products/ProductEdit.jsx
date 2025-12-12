@@ -1,5 +1,5 @@
 import { ArrowLeft, Save } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { useNavigate, useParams } from "react-router-dom";
 import Button from "../../components/common/Button";
@@ -24,11 +24,7 @@ const ProductEdit = () => {
     is_active: true,
   });
 
-  useEffect(() => {
-    fetchProduct();
-  }, [id]);
-
-  const fetchProduct = async () => {
+  const fetchProduct = useCallback(async () => {
     try {
       setFetching(true);
       const response = await productService.getProductById(id);
@@ -51,7 +47,11 @@ const ProductEdit = () => {
     } finally {
       setFetching(false);
     }
-  };
+  }, [id, navigate]);
+
+  useEffect(() => {
+    fetchProduct();
+  }, [fetchProduct]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -70,14 +70,14 @@ const ProductEdit = () => {
       const productData = {
         name: formData.name,
         sku: formData.sku,
-        unit_price: parseFloat(formData.unit_price),
+        unit_price: parseFloat(formData.unit_price) || 0,
         description: formData.description || "",
         is_active: formData.is_active,
       };
 
       // Add optional fields only if they have values
       if (formData.category_id) {
-        productData.category_id = parseInt(formData.category_id);
+        productData.category_id = parseInt(formData.category_id, 10);
       }
       if (formData.size) {
         productData.size = formData.size;
