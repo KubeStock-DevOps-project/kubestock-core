@@ -1,0 +1,68 @@
+name: Automated Performance Tests
+
+on:
+  # workflow_run:
+  #   workflows: ["CI/CD", "Manual Full Pipeline"]
+  #   types:
+  #     - completed
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: 'Target URL for testing (e.g., http://staging.kubestock.com)'
+        required: false
+        default: ''
+
+jobs:
+  performance-tests:
+    name: K6 Performance Tests
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Determine Target URL
+        id: set-url
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.target_url }}" ]]; then
+            echo "BASE_URL=${{ inputs.target_url }}" >> $GITHUB_ENV
+          elif [[ "${{ github.event.workflow_run.head_branch }}" == "main" ]]; then
+            echo "BASE_URL=${{ secrets.PROD_URL }}" >> $GITHUB_ENV
+          else
+            echo "BASE_URL=${{ secrets.STAGING_URL }}" >> $GITHUB_ENV
+          fi
+
+      - name: Wait for Deployment (Health Check)
+        id: health-check
+        env:
+          MAX_RETRIES: 30
+          SLEEP_SECONDS: 10
+        run: |
+          echo "Waiting for service at $BASE_URL to be healthy..."
+          count=0
+          until curl -s -f "$BASE_URL/health" > /dev/null || [ $count -ge $MAX_RETRIES ]; do
+            echo "Attempt $((count+1))/$MAX_RETRIES: Service not ready yet..."
+            sleep $SLEEP_SECONDS
+            count=$((count+1))
+          done
+          
+          if [ $count -ge $MAX_RETRIES ]; then
+            echo "❌ Service failed to become healthy after $((MAX_RETRIES*SLEEP_SECONDS)) seconds."
+            exit 1
+          fi
+          
+          echo "✅ Service is healthy!"
+
+      - name: Setup K6
+        uses: grafana/setup-k6-action@v1
+
+      - name: Run Smoke Test
+        run: |
+          echo "Running Smoke Test against $BASE_URL..."
+          k6 run tests/k6/smoke.js -e BASE_URL=$BASE_URL
+
+      - name: Run Load Test
+        run: |
+          echo "Running Load Test against $BASE_URL..."
+          k6 run tests/k6/load.js -e BASE_URL=$BASE_URL

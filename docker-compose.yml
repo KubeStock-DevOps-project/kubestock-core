@@ -33,7 +33,7 @@ services:
     networks:
       - kubestock-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -68,7 +68,7 @@ services:
       - ./services/ms-product/src:/app/src:ro
       - ./services/ms-product/migrations:/app/migrations:ro
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3002/health"]
+      test: [ "CMD", "node", "-e", "require('http').get('http://127.0.0.1:3002/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -107,7 +107,7 @@ services:
       - ./services/ms-inventory/src:/app/src:ro
       - ./services/ms-inventory/migrations:/app/migrations:ro
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3003/health"]
+      test: [ "CMD", "node", "-e", "require('http').get('http://127.0.0.1:3003/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -149,7 +149,7 @@ services:
       - ./services/ms-supplier/src:/app/src:ro
       - ./services/ms-supplier/migrations:/app/migrations:ro
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3004/health"]
+      test: [ "CMD", "node", "-e", "require('http').get('http://127.0.0.1:3004/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -191,7 +191,7 @@ services:
       - ./services/ms-order-management/src:/app/src:ro
       - ./services/ms-order-management/migrations:/app/migrations:ro
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3005/health"]
+      test: [ "CMD", "node", "-e", "require('http').get('http://127.0.0.1:3005/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -230,11 +230,11 @@ services:
     volumes:
       - ./services/ms-identity/src:/app/src:ro
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3006/health"]
+      test: [ "CMD", "node", "-e", "require('http').get('http://127.0.0.1:3006/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})" ]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 40s
 
   # ─────────────────────────────────────────────────────────────────
   # Frontend (React/Vite)
@@ -253,6 +253,12 @@ services:
       - "3000:80"
     networks:
       - kubestock-network
+    healthcheck:
+      test: [ "CMD", "wget", "--spider", "-q", "http://127.0.0.1/" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
 
   # ─────────────────────────────────────────────────────────────────
   # API Gateway (NGINX) - Main entry point on port 5173
@@ -271,6 +277,44 @@ services:
       - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
     networks:
       - kubestock-network
+    depends_on:
+      frontend:
+        condition: service_healthy
+      ms-product:
+        condition: service_healthy
+      ms-inventory:
+        condition: service_healthy
+      ms-supplier:
+        condition: service_healthy
+      ms-order-management:
+        condition: service_healthy
+      ms-identity:
+        condition: service_healthy
+
+  # ─────────────────────────────────────────────────────────────────
+  # Test Runner Service (ms-test-runner)
+  # ─────────────────────────────────────────────────────────────────
+  ms-test-runner:
+    build:
+      context: ./services/test-runner
+      dockerfile: Dockerfile
+    container_name: ms-test-runner
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 3007
+      HOST: 0.0.0.0
+      GATEWAY_URL: http://api-gateway:80
+      # Asgardeo Credentials (M2M) - Taken from .env
+      ASGARDEO_TOKEN_URL: ${ASGARDEO_TOKEN_URL:-https://api.asgardeo.io/t/kubestock/oauth2/token}
+      ASGARDEO_CLIENT_ID: ${ASGARDEO_M2M_CLIENT_ID}
+      ASGARDEO_CLIENT_SECRET: ${ASGARDEO_M2M_CLIENT_SECRET}
+    ports:
+      - "3007:3007"
+    networks:
+      - kubestock-network
+    volumes:
+      - ./services/test-runner/src:/app/src:ro
 
 networks:
   kubestock-network:

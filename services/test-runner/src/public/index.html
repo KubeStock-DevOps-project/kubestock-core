@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KubeStock Test Runner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #111827;
+            color: #e5e7eb;
+            font-family: sans-serif;
+        }
+
+        .console {
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+
+<body class="p-8">
+    <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+        <!-- Config Panel -->
+        <div class="lg:col-span-1 bg-gray-800 rounded-lg p-6 border border-gray-700 h-fit">
+            <h1 class="text-2xl font-bold text-blue-400 mb-6">KubeStock Test Runner</h1>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Test Type</label>
+                    <select id="testType"
+                        class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                        <option value="smoke">Smoke Test</option>
+                        <option value="load">Load Test</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Target URL</label>
+                    <input type="text" id="targetUrl" placeholder="http://api-gateway:80" value="http://api-gateway:80"
+                        class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none text-white">
+                    <p class="text-xs text-gray-500 mt-1">Internal: <code>http://api-gateway:80</code></p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1">VUs</label>
+                        <input type="number" id="vus" value="1"
+                            class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1">Duration</label>
+                        <input type="text" id="duration" value="10s"
+                            class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none text-white">
+                    </div>
+                </div>
+
+                <!-- Advanced Options -->
+                <div class="pt-4 border-t border-gray-700">
+                    <button onclick="document.getElementById('advancedOptions').classList.toggle('hidden')"
+                        class="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1 mb-2 focus:outline-none">
+                        <span>⚙️ Advanced: Direct Service URLs</span>
+                    </button>
+
+                    <div id="advancedOptions" class="hidden space-y-3 text-sm">
+                        <p class="text-xs text-gray-500 mb-2">Override Gateway URL for specific services (e.g. to bypass
+                            rate limits).</p>
+
+                        <div>
+                            <input type="text" id="productUrl" placeholder="Product Service URL"
+                                class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none text-white text-xs">
+                        </div>
+                        <div>
+                            <input type="text" id="inventoryUrl" placeholder="Inventory Service URL"
+                                class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none text-white text-xs">
+                        </div>
+                        <div>
+                            <input type="text" id="supplierUrl" placeholder="Supplier Service URL"
+                                class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none text-white text-xs">
+                        </div>
+                        <div>
+                            <input type="text" id="orderUrl" placeholder="Order Service URL"
+                                class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none text-white text-xs">
+                        </div>
+                        <div>
+                            <input type="text" id="identityUrl" placeholder="Identity Service URL"
+                                class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none text-white text-xs">
+                        </div>
+                    </div>
+                </div>
+
+                <button onclick="startTest()" id="runBtn"
+                    class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded transition-all shadow-lg shadow-blue-500/30">
+                    Start Test Run
+                </button>
+            </div>
+        </div>
+
+        <!-- Logs Panel -->
+        <div class="lg:col-span-2 bg-black border border-gray-800 rounded-lg flex flex-col h-[600px]">
+            <div class="p-3 border-b border-gray-800 flex justify-between items-center bg-gray-900/50">
+                <span class="text-gray-400 text-sm font-mono">Console Output</span>
+                <span id="statusBadge"
+                    class="px-2 py-1 rounded text-xs uppercase font-bold bg-gray-800 text-gray-500">Idle</span>
+            </div>
+            <div id="logs" class="flex-1 p-4 overflow-y-auto console text-green-400 text-sm">Waiting for execution...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentTestId = null;
+        let pollInterval = null;
+
+        async function startTest() {
+            const btn = document.getElementById('runBtn');
+            const statusBadge = document.getElementById('statusBadge');
+            const logsDiv = document.getElementById('logs');
+            const testType = document.getElementById('testType').value;
+            const vus = document.getElementById('vus').value;
+            const duration = document.getElementById('duration').value;
+            const targetUrl = document.getElementById('targetUrl').value;
+
+            // Collect optional service URLs
+            const serviceUrls = {
+                product: document.getElementById('productUrl').value,
+                inventory: document.getElementById('inventoryUrl').value,
+                supplier: document.getElementById('supplierUrl').value,
+                order: document.getElementById('orderUrl').value,
+                identity: document.getElementById('identityUrl').value
+            };
+
+            // Remove empty keys
+            Object.keys(serviceUrls).forEach(key => !serviceUrls[key] && delete serviceUrls[key]);
+
+            // Reset UI
+            logsDiv.innerText = '';
+            btn.disabled = true;
+            btn.classList.add('bg-gray-600', 'cursor-not-allowed');
+            statusBadge.className = 'px-2 py-1 rounded text-xs uppercase font-bold bg-blue-900 text-blue-300';
+            statusBadge.innerText = 'Running';
+
+            try {
+                const res = await fetch('/api/tests/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ testType, vus, duration, targetUrl, serviceUrls })
+                });
+                const data = await res.json();
+
+                if (data.error) {
+                    throw new Error(data.error + (data.details ? `: ${data.details}` : ''));
+                }
+
+                if (data.testId) {
+                    currentTestId = data.testId;
+                    pollLogs();
+                } else {
+                    throw new Error('No test ID returned');
+                }
+            } catch (err) {
+                logsDiv.innerText = `❌ Error: ${err.message}`;
+                resetUI('failed');
+            }
+        }
+
+        function pollLogs() {
+            if (pollInterval) clearInterval(pollInterval);
+            pollInterval = setInterval(async () => {
+                try {
+                    const res = await fetch(`/api/tests/${currentTestId}/logs`);
+                    const data = await res.json();
+
+                    const logContainer = document.getElementById('logs');
+                    logContainer.innerText = data.logs.join('\n');
+                    logContainer.scrollTop = logContainer.scrollHeight;
+
+                    // Check status
+                    const statusRes = await fetch(`/api/tests/${currentTestId}/status`);
+                    const statusData = await statusRes.json();
+
+                    if (statusData.status === 'completed' || statusData.status === 'failed') {
+                        clearInterval(pollInterval);
+                        resetUI(statusData.status);
+                    }
+                } catch (err) {
+                    console.error('Polling error:', err);
+                }
+            }, 1000);
+        }
+
+        function resetUI(status) {
+            const btn = document.getElementById('runBtn');
+            const statusBadge = document.getElementById('statusBadge');
+
+            btn.disabled = false;
+            btn.classList.remove('bg-gray-600', 'cursor-not-allowed');
+
+            if (status === 'completed') {
+                statusBadge.className = 'px-2 py-1 rounded text-xs uppercase font-bold bg-green-900 text-green-300';
+                statusBadge.innerText = 'Completed';
+            } else {
+                statusBadge.className = 'px-2 py-1 rounded text-xs uppercase font-bold bg-red-900 text-red-300';
+                statusBadge.innerText = 'Failed';
+            }
+        }
+    </script>
+</body>
+
+</html>
