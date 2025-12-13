@@ -4,6 +4,42 @@ const cors = require('cors');
 const path = require('path');
 const { getAccessToken, getUserAccessToken, getM2MAccessToken } = require('./auth');
 
+// Prometheus metrics
+const client = require('prom-client');
+const register = new client.Registry();
+
+// Default metrics (process, memory, etc.)
+client.collectDefaultMetrics({ register });
+
+// Custom metrics for test-runner
+const testRunsTotal = new client.Counter({
+    name: 'test_runner_runs_total',
+    help: 'Total number of test runs',
+    labelNames: ['test_type', 'status'],
+    registers: [register]
+});
+
+const testDuration = new client.Histogram({
+    name: 'test_runner_duration_seconds',
+    help: 'Duration of test runs in seconds',
+    labelNames: ['test_type'],
+    buckets: [5, 10, 30, 60, 120, 300, 600],
+    registers: [register]
+});
+
+const activeTests = new client.Gauge({
+    name: 'test_runner_active_tests',
+    help: 'Number of currently running tests',
+    registers: [register]
+});
+
+const authRequestsTotal = new client.Counter({
+    name: 'test_runner_auth_requests_total',
+    help: 'Total number of authentication requests',
+    labelNames: ['auth_type', 'status'],
+    registers: [register]
+});
+
 const app = express();
 app.use(express.json());
 app.use(cors());
@@ -16,6 +52,16 @@ const runningTests = {};
 
 app.get('/health', (req, res) => {
     res.json({ status: 'UP', service: 'test-runner' });
+});
+
+// Prometheus metrics endpoint
+app.get('/metrics', async (req, res) => {
+    try {
+        res.set('Content-Type', register.contentType);
+        res.end(await register.metrics());
+    } catch (err) {
+        res.status(500).end(err.message);
+    }
 });
 
 /**
@@ -61,16 +107,20 @@ app.post('/api/tests/run', async (req, res) => {
             // User authentication from request body
             console.log(`🔐 Authenticating user: ${auth.username}`);
             accessToken = await getUserAccessToken(auth.username, auth.password) || '';
+            authRequestsTotal.inc({ auth_type: 'user', status: 'success' });
         } else if (auth.useM2M) {
             // Force M2M authentication
             console.log('🔐 Using M2M authentication');
             accessToken = await getM2MAccessToken() || '';
+            authRequestsTotal.inc({ auth_type: 'm2m', status: 'success' });
         } else {
             // Default: Use environment variables (username/password or M2M)
             console.log('🔐 Using default authentication from environment');
             accessToken = await getAccessToken() || '';
+            authRequestsTotal.inc({ auth_type: 'default', status: 'success' });
         }
     } catch (err) {
+        authRequestsTotal.inc({ auth_type: 'unknown', status: 'failed' });
         return res.status(500).json({ error: 'Authentication failed', details: err.message });
     }
 
@@ -125,6 +175,11 @@ app.post('/api/tests/run', async (req, res) => {
     console.log(`🚀 Starting Test: ${k6Command}`);
 
     const testId = Date.now().toString();
+    const testStartTime = Date.now();
+    
+    // Track active tests
+    activeTests.inc();
+    
     runningTests[testId] = {
         id: testId,
         status: 'running',
@@ -181,6 +236,12 @@ app.post('/api/tests/run', async (req, res) => {
         runningTests[testId].status = status;
         runningTests[testId].exitCode = code;
         runningTests[testId].endTime = new Date();
+
+        // Track metrics
+        activeTests.dec();
+        testRunsTotal.inc({ test_type: runningTests[testId].testType, status: status });
+        const durationSeconds = (Date.now() - testStartTime) / 1000;
+        testDuration.observe({ test_type: runningTests[testId].testType }, durationSeconds);
 
         // Handle Webhook Callback
         if (runningTests[testId].webhookUrl) {
