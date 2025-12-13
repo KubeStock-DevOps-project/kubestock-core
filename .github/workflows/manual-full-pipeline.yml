@@ -97,6 +97,8 @@ jobs:
             path: services/ms-identity
           - name: web
             path: apps/web
+          - name: test-runner
+            path: services/test-runner
     
     steps:
       - uses: actions/checkout@v4
@@ -143,6 +145,8 @@ jobs:
             path: services/ms-identity
           - name: web
             path: apps/web
+          - name: test-runner
+            path: services/test-runner
     
     steps:
       - uses: actions/checkout@v4
@@ -239,6 +243,8 @@ jobs:
             path: services/ms-identity
           - name: web
             path: apps/web
+          - name: test-runner
+            path: services/test-runner
     
     steps:
       - uses: actions/checkout@v4

@@ -38,6 +38,7 @@ jobs:
       ms-order-management: ${{ steps.filter.outputs.ms-order-management }}
       ms-identity: ${{ steps.filter.outputs.ms-identity }}
       web: ${{ steps.filter.outputs.web }}
+      test-runner: ${{ steps.filter.outputs.test-runner }}
       any-service: ${{ steps.check.outputs.any-service }}
       image-tag: ${{ steps.tag.outputs.image-tag }}
     
@@ -66,6 +67,9 @@ jobs:
             web:
               - 'apps/web/**'
               - 'packages/**'
+            test-runner:
+              - 'services/test-runner/**'
+              - 'packages/**'
       
       - name: Check if any service changed
         id: check
@@ -75,7 +79,8 @@ jobs:
              [[ "${{ steps.filter.outputs.ms-supplier }}" == "true" ]] || \
              [[ "${{ steps.filter.outputs.ms-order-management }}" == "true" ]] || \
              [[ "${{ steps.filter.outputs.ms-identity }}" == "true" ]] || \
-             [[ "${{ steps.filter.outputs.web }}" == "true" ]]; then
+             [[ "${{ steps.filter.outputs.web }}" == "true" ]] || \
+             [[ "${{ steps.filter.outputs.test-runner }}" == "true" ]]; then
             echo "any-service=true" >> $GITHUB_OUTPUT
           else
             echo "any-service=false" >> $GITHUB_OUTPUT
@@ -123,6 +128,10 @@ jobs:
             changed: ${{ needs.detect-changes.outputs.web }}
             path: apps/web
             ecr-repo: kubestock/web
+          - name: test-runner
+            changed: ${{ needs.detect-changes.outputs.test-runner }}
+            path: services/test-runner
+            ecr-repo: kubestock/test-runner
 
     steps:
       - name: Checkout code
