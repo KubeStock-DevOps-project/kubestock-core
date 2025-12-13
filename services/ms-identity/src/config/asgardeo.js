@@ -32,6 +32,7 @@ class AsgardeoClient {
      */
     async getAccessToken() {
         // Return cached token if still valid
+        console.log("Checking for cached Asgardeo token...");
         if (
             this.accessToken &&
             this.tokenExpiry &&
