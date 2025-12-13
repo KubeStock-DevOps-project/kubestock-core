@@ -32,6 +32,7 @@ class AsgardeoClient {
      */
     async getAccessToken() {
         // Return cached token if still valid
+        console.log("Checking for cached Asgardeo token...");
         if (
             this.accessToken &&
             this.tokenExpiry &&
@@ -41,6 +42,8 @@ class AsgardeoClient {
         }
 
         try {
+            console.log(`Requesting new Asgardeo token from ${this.tokenUrl}... with client ID ${this.clientId} and client secret ${this.clientSecret}`);
+
             const credentials = Buffer.from(
                 `${this.clientId}:${this.clientSecret}`
             ).toString("base64");
