@@ -2,7 +2,7 @@ const express = require('express');
 const { exec } = require('child_process');
 const cors = require('cors');
 const path = require('path');
-const { getAccessToken } = require('./auth');
+const { getAccessToken, getUserAccessToken, getM2MAccessToken } = require('./auth');
 
 const app = express();
 app.use(express.json());
@@ -18,37 +18,111 @@ app.get('/health', (req, res) => {
     res.json({ status: 'UP', service: 'test-runner' });
 });
 
+/**
+ * Run tests endpoint
+ * @body {
+ *   testType: 'smoke' | 'load',
+ *   vus: number,
+ *   duration: string,
+ *   stages: array (for load tests),
+ *   gatewayUrl: string (for smoke tests),
+ *   serviceUrls: { product, inventory, supplier, order, identity } (for load tests - direct calls),
+ *   auth: {
+ *     username: string (optional - for user auth),
+ *     password: string (optional - for user auth),
+ *     useM2M: boolean (optional - force M2M auth)
+ *   },
+ *   webhookUrl: string (optional)
+ * }
+ */
 app.post('/api/tests/run', async (req, res) => {
-    const { testType = 'smoke', vus = 1, duration = '5s', targetUrl, serviceUrls = {}, webhookUrl } = req.body;
+    const { 
+        testType = 'smoke', 
+        vus = 1, 
+        duration = '5s',
+        stages,
+        gatewayUrl,
+        serviceUrls = {},
+        auth = {},
+        webhookUrl 
+    } = req.body;
 
     // Validate test type
     const scriptPath = path.join(__dirname, 'k6', `${testType}.js`);
-
-    // Determine Base URL
-    const baseUrl = targetUrl || process.env.GATEWAY_URL || 'http://host.docker.internal:5173';
+    const fs = require('fs');
+    if (!fs.existsSync(scriptPath)) {
+        return res.status(400).json({ error: `Invalid test type: ${testType}` });
+    }
 
     // Get Auth Token
     let accessToken = '';
     try {
-        accessToken = await getAccessToken() || '';
+        if (auth.username && auth.password) {
+            // User authentication from request body
+            console.log(`🔐 Authenticating user: ${auth.username}`);
+            accessToken = await getUserAccessToken(auth.username, auth.password) || '';
+        } else if (auth.useM2M) {
+            // Force M2M authentication
+            console.log('🔐 Using M2M authentication');
+            accessToken = await getM2MAccessToken() || '';
+        } else {
+            // Default: Use environment variables (username/password or M2M)
+            console.log('🔐 Using default authentication from environment');
+            accessToken = await getAccessToken() || '';
+        }
     } catch (err) {
         return res.status(500).json({ error: 'Authentication failed', details: err.message });
     }
 
-    // Construct k6 command
-    // Pass params via environment variables to k6
-    let envVars = `-e BASE_URL=${baseUrl} -e ACCESS_TOKEN=${accessToken}`;
+    // Construct k6 command based on test type
+    let k6Command = '';
+    let envVars = `-e ACCESS_TOKEN=${accessToken}`;
 
-    // Add specific service URLs if provided
-    if (serviceUrls.product) envVars += ` -e PRODUCT_URL=${serviceUrls.product}`;
-    if (serviceUrls.inventory) envVars += ` -e INVENTORY_URL=${serviceUrls.inventory}`;
-    if (serviceUrls.supplier) envVars += ` -e SUPPLIER_URL=${serviceUrls.supplier}`;
-    if (serviceUrls.order) envVars += ` -e ORDER_URL=${serviceUrls.order}`;
-    if (serviceUrls.identity) envVars += ` -e IDENTITY_URL=${serviceUrls.identity}`;
+    if (testType === 'smoke') {
+        // Smoke tests: Use gateway URL
+        const targetUrl = gatewayUrl || process.env.GATEWAY_URL || 'http://host.docker.internal:5173';
+        envVars += ` -e GATEWAY_URL=${targetUrl}`;
+        
+        // Pass service endpoints through gateway (with /api prefix)
+        if (serviceUrls.product) envVars += ` -e PRODUCT_URL=${serviceUrls.product}`;
+        if (serviceUrls.inventory) envVars += ` -e INVENTORY_URL=${serviceUrls.inventory}`;
+        if (serviceUrls.supplier) envVars += ` -e SUPPLIER_URL=${serviceUrls.supplier}`;
+        if (serviceUrls.order) envVars += ` -e ORDER_URL=${serviceUrls.order}`;
+        if (serviceUrls.identity) envVars += ` -e IDENTITY_URL=${serviceUrls.identity}`;
 
-    const cmd = `k6 run --vus ${vus} --duration ${duration} ${envVars} ${scriptPath}`;
+        k6Command = `k6 run --vus ${vus} --duration ${duration} ${envVars} ${scriptPath}`;
+        
+    } else if (testType === 'load') {
+        // Load tests: Direct microservice calls (no /api prefix)
+        // Services are required for load tests
+        if (!serviceUrls.product && !serviceUrls.inventory && !serviceUrls.supplier && !serviceUrls.order) {
+            return res.status(400).json({ 
+                error: 'Load tests require at least one service URL in serviceUrls (product, inventory, supplier, order)' 
+            });
+        }
 
-    console.log(`🚀 Starting Test: ${cmd}`);
+        // Pass service URLs as environment variables for load test
+        if (serviceUrls.product) envVars += ` -e PRODUCT_URL=${serviceUrls.product}`;
+        if (serviceUrls.inventory) envVars += ` -e INVENTORY_URL=${serviceUrls.inventory}`;
+        if (serviceUrls.supplier) envVars += ` -e SUPPLIER_URL=${serviceUrls.supplier}`;
+        if (serviceUrls.order) envVars += ` -e ORDER_URL=${serviceUrls.order}`;
+        if (serviceUrls.identity) envVars += ` -e IDENTITY_URL=${serviceUrls.identity}`;
+
+        // Handle load test stages if provided, otherwise use vus + duration
+        if (stages && Array.isArray(stages)) {
+            // Custom stages provided
+            const stagesJson = JSON.stringify(stages);
+            envVars += ` -e STAGES='${stagesJson}'`;
+            k6Command = `k6 run ${envVars} ${scriptPath}`;
+        } else {
+            // Use simple vus and duration
+            k6Command = `k6 run --vus ${vus} --duration ${duration} ${envVars} ${scriptPath}`;
+        }
+    } else {
+        return res.status(400).json({ error: `Unsupported test type: ${testType}` });
+    }
+
+    console.log(`🚀 Starting Test: ${k6Command}`);
 
     const testId = Date.now().toString();
     runningTests[testId] = {
@@ -56,17 +130,15 @@ app.post('/api/tests/run', async (req, res) => {
         status: 'running',
         startTime: new Date(),
         logs: [],
-        cmd,
-        webhookUrl
+        cmd: k6Command,
+        webhookUrl,
+        testType
     };
 
     // Execute k6
-    const child = exec(cmd);
+    const child = exec(k6Command);
 
     // Ensure logs directory exists
-    // Ensure logs directory exists (Use /app/logs, NOT /app/src/logs because src is RO)
-    const fs = require('fs');
-    // WORKDIR is /app, so process.cwd() is /app. logs will be at /app/logs
     const logDir = path.join(process.cwd(), 'logs');
     try {
         if (!fs.existsSync(logDir)) {
@@ -137,6 +209,7 @@ app.post('/api/tests/run', async (req, res) => {
         message: 'Test run accepted',
         testId,
         status: 'running',
+        testType,
         links: {
             status: `/api/tests/${testId}/status`,
             logs: `/api/tests/${testId}/logs`

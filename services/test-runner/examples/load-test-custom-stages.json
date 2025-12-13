@@ -1,0 +1,17 @@
+{
+  "testType": "load",
+  "serviceUrls": {
+    "inventory": "http://localhost:3003"
+  },
+  "stages": [
+    { "duration": "30s", "target": 20 },
+    { "duration": "1m", "target": 50 },
+    { "duration": "2m", "target": 100 },
+    { "duration": "1m", "target": 50 },
+    { "duration": "30s", "target": 0 }
+  ],
+  "auth": {
+    "username": "perftest@kubestock.com",
+    "password": "PerfTest123!"
+  }
+}

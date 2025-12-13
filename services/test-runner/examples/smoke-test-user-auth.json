@@ -1,0 +1,10 @@
+{
+  "testType": "smoke",
+  "vus": 1,
+  "duration": "10s",
+  "gatewayUrl": "http://localhost:5173",
+  "auth": {
+    "username": "admin@kubestock.com",
+    "password": "Admin123!"
+  }
+}

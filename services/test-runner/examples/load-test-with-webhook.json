@@ -1,0 +1,16 @@
+{
+  "testType": "load",
+  "serviceUrls": {
+    "product": "http://product-service:3002",
+    "inventory": "http://inventory-service:3003"
+  },
+  "stages": [
+    { "duration": "2m", "target": 100 },
+    { "duration": "5m", "target": 100 },
+    { "duration": "2m", "target": 0 }
+  ],
+  "webhookUrl": "http://monitoring-service:8080/test-complete",
+  "auth": {
+    "useM2M": true
+  }
+}

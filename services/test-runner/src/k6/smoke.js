@@ -10,10 +10,8 @@ export const options = {
     // },
 };
 
-const BASE_URL = __ENV.BASE_URL || 'http://localhost:5173';
+const GATEWAY_URL = __ENV.GATEWAY_URL || 'http://localhost:5173';
 const ACCESS_TOKEN = __ENV.ACCESS_TOKEN;
-
-
 
 const headers = {
     'Content-Type': 'application/json',
@@ -27,53 +25,63 @@ const params = {
 };
 
 export default function () {
-    // 1. Check Product Service
-    const productUrl = __ENV.PRODUCT_URL || `${BASE_URL}/api/product`;
+    console.log(`🔍 Running smoke tests through gateway: ${GATEWAY_URL}`);
+
+    // 1. Check Gateway Health
+    const gatewayHealthUrl = `${GATEWAY_URL}/api/gateway/health`;
+    const resGateway = http.get(gatewayHealthUrl, params);
+    check(resGateway, {
+        '✅ Gateway Health Check': (r) => r.status === 200,
+    });
+    if (resGateway.status !== 200) {
+        console.error(`❌ Gateway Health failed: ${resGateway.status} ${resGateway.body}`);
+    }
+
+    // 2. Check Product Service through Gateway
+    const productUrl = __ENV.PRODUCT_URL || `${GATEWAY_URL}/api/product`;
     const resProduct = http.get(productUrl, params);
     check(resProduct, {
-        '✅ Product Service UP': (r) => r.status === 200,
+        '✅ Product Service UP (via Gateway)': (r) => r.status === 200,
     });
     if (resProduct.status !== 200) {
         console.error(`❌ Product Service failed: ${resProduct.status} ${resProduct.body}`);
     }
 
-    // 2. Check Inventory Service
-    // Critical dependency for stock management
-    const inventoryUrl = __ENV.INVENTORY_URL || `${BASE_URL}/api/inventory`;
+    // 3. Check Inventory Service through Gateway
+    const inventoryUrl = __ENV.INVENTORY_URL || `${GATEWAY_URL}/api/inventory`;
     const resInventory = http.get(inventoryUrl, params);
     check(resInventory, {
-        '✅ Inventory Service UP': (r) => r.status === 200,
+        '✅ Inventory Service UP (via Gateway)': (r) => r.status === 200,
     });
     if (resInventory.status !== 200) {
         console.error(`❌ Inventory Service failed: ${resInventory.status} ${resInventory.body}`);
     }
 
-    // 3. Check Supplier Service
-    const supplierUrl = __ENV.SUPPLIER_URL || `${BASE_URL}/api/supplier`;
+    // 4. Check Supplier Service through Gateway
+    const supplierUrl = __ENV.SUPPLIER_URL || `${GATEWAY_URL}/api/supplier`;
     const resSupplier = http.get(supplierUrl, params);
     check(resSupplier, {
-        '✅ Supplier Service UP': (r) => r.status === 200,
+        '✅ Supplier Service UP (via Gateway)': (r) => r.status === 200,
     });
     if (resSupplier.status !== 200) {
         console.error(`❌ Supplier Service failed: ${resSupplier.status} ${resSupplier.body}`);
     }
 
-    // 4. Check Order Management Service
-    const orderUrl = __ENV.ORDER_URL || `${BASE_URL}/api/order`;
+    // 5. Check Order Management Service through Gateway
+    const orderUrl = __ENV.ORDER_URL || `${GATEWAY_URL}/api/order`;
     const resOrder = http.get(orderUrl, params);
     check(resOrder, {
-        '✅ Order Service UP': (r) => r.status === 200,
+        '✅ Order Service UP (via Gateway)': (r) => r.status === 200,
     });
     if (resOrder.status !== 200) {
         console.error(`❌ Order Service failed: ${resOrder.status} ${resOrder.body}`);
     }
 
-    // 5. Check Identity/Auth Service (Optional but recommended)
-    // Often these endpoints require auth headers, so checking health/public info is safer
-    const identityUrl = __ENV.IDENTITY_URL || `${BASE_URL}/api/identity/health`;
+    // 6. Check Identity Service through Gateway
+    const identityUrl = __ENV.IDENTITY_URL || `${GATEWAY_URL}/api/identity/health`;
     const resIdentity = http.get(identityUrl, params);
     check(resIdentity, {
-        '✅ Identity Service UP': (r) => r.status === 200 || r.status === 401, // 401 is okay (means service is alive but secured)
+        '✅ Identity Service UP (via Gateway)': (r) => r.status === 200 || r.status === 401,
     });
     if (resIdentity.status !== 200 && resIdentity.status !== 401) {
         console.error(`❌ Identity Service failed: ${resIdentity.status} ${resIdentity.body}`);

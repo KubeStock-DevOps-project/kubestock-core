@@ -1,0 +1,12 @@
+{
+  "testType": "load",
+  "vus": 50,
+  "duration": "1m",
+  "serviceUrls": {
+    "product": "http://localhost:3002"
+  },
+  "auth": {
+    "username": "loadtest@kubestock.com",
+    "password": "LoadTest123!"
+  }
+}
