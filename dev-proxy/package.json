@@ -1,0 +1,14 @@
+{
+  "name": "kubestock-dev-proxy",
+  "version": "1.0.0",
+  "description": "Development reverse proxy for KubeStock",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev:proxy": "node dev-proxy.js"
+  },
+  "dependencies": {
+    "http-proxy": "^1.18.1",
+    "express": "^4.20.0"
+  }
+}

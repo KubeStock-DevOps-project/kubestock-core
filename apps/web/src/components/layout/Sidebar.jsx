@@ -1,20 +1,19 @@
-import { NavLink } from "react-router-dom";
-import { useAuth } from "../../hooks/useAuth";
 import {
-  LayoutDashboard,
-  Package,
-  Boxes,
-  Users,
-  Truck,
-  ShoppingCart,
   Activity,
+  AlertTriangle,
+  Boxes,
+  Calculator,
   ChevronLeft,
   ChevronRight,
   GitBranch,
-  Calculator,
-  AlertTriangle,
-  UserCog,
+  LayoutDashboard,
+  Package,
+  ShoppingCart,
+  Truck,
+  Users,
 } from "lucide-react";
+import { NavLink } from "react-router-dom";
+import { useAuth } from "../../hooks/useAuth";
 import { cn } from "../../utils/helpers";
 
 const Sidebar = ({ isOpen, setIsOpen }) => {
@@ -111,7 +110,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
 
   // Filter menu items based on user's roles (array)
   const filteredMenuItems = menuItems.filter((item) =>
-    item.roles.some(role => user?.roles?.includes(role))
+    item.roles.some((role) => user?.roles?.includes(role))
   );
 
   return (
