@@ -1,0 +1,14 @@
+{
+  "testType": "load",
+  "vus": 100,
+  "duration": "2m",
+  "serviceUrls": {
+    "product": "http://localhost:3002",
+    "inventory": "http://localhost:3003",
+    "supplier": "http://localhost:3004",
+    "order": "http://localhost:3005"
+  },
+  "auth": {
+    "useM2M": true
+  }
+}

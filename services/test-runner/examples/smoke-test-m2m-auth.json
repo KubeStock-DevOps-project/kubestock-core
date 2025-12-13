@@ -1,0 +1,9 @@
+{
+  "testType": "smoke",
+  "vus": 1,
+  "duration": "15s",
+  "gatewayUrl": "http://localhost:5173",
+  "auth": {
+    "useM2M": true
+  }
+}

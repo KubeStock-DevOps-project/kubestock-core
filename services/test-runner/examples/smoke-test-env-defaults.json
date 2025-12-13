@@ -1,0 +1,4 @@
+{
+  "testType": "smoke",
+  "gatewayUrl": "http://localhost:5173"
+}
