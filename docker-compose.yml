@@ -305,10 +305,13 @@ services:
       PORT: 3007
       HOST: 0.0.0.0
       GATEWAY_URL: http://api-gateway:80
-      # Asgardeo Credentials (M2M) - Taken from .env
-      ASGARDEO_TOKEN_URL: ${ASGARDEO_TOKEN_URL:-https://api.asgardeo.io/t/kubestock/oauth2/token}
-      ASGARDEO_CLIENT_ID: ${ASGARDEO_M2M_CLIENT_ID}
-      ASGARDEO_CLIENT_SECRET: ${ASGARDEO_M2M_CLIENT_SECRET}
+      # Asgardeo M2M Client (Password Grant enabled for test runner)
+      ASGARDEO_TOKEN_URL: ${ASGARDEO_TOKEN_URL}
+      ASGARDEO_CLIENT_ID: ${ASGARDEO_TEST_CLIENT_ID}
+      ASGARDEO_CLIENT_SECRET: ${ASGARDEO_TEST_CLIENT_SECRET}
+      # Test User Credentials (will be used by default if no auth provided in request)
+      ASGARDEO_USERNAME: ${ASGARDEO_USERNAME}
+      ASGARDEO_PASSWORD: ${ASGARDEO_PASSWORD}
     ports:
       - "3007:3007"
     networks:
