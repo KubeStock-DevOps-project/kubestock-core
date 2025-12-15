@@ -78,16 +78,24 @@ app.get("/metrics", async (req, res) => {
 // Routes - gateway strips /api/supplier prefix before forwarding
 // Note: Supplier CRUD and ratings are now handled via Asgardeo identity service
 // app.use("/ratings", supplierRatingRoutes); // REMOVED: Ratings table removed
+
+// Root endpoint for health checks
+app.get("/", (req, res) => {
+  res.status(200).json({
+    success: true,
+    service: "supplier-service",
+    message: "Supplier Service API - Suppliers managed via Asgardeo",
+    availableEndpoints: ["/health", "/purchase-orders"],
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.use("/purchase-orders", purchaseOrderRoutes);
 // app.use("/", supplierRoutes); // REMOVED: Suppliers managed via Asgardeo
 
 // Error handling
 app.use(notFoundHandler);
 app.use(errorHandler);
-
-app.use((req, res) => {
-  res.status(404).json({ success: false, message: "Route not found" });
-});
 
 const HOST = process.env.HOST || "127.0.0.1";
 
