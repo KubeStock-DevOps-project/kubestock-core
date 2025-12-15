@@ -12,7 +12,7 @@ const {
 } = require("./middlewares/metrics");
 // const supplierRoutes = require("./routes/supplier.routes"); // REMOVED: Suppliers managed via Asgardeo
 const purchaseOrderRoutes = require("./routes/purchaseOrder.routes");
-// const supplierRatingRoutes = require("./routes/supplierRating.routes"); // REMOVED: Ratings table removed
+const supplierRatingRoutes = require("./routes/supplierRating.routes");
 const {
   errorHandler,
   notFoundHandler,
@@ -77,7 +77,7 @@ app.get("/metrics", async (req, res) => {
 
 // Routes - gateway strips /api/supplier prefix before forwarding
 // Note: Supplier CRUD and ratings are now handled via Asgardeo identity service
-// app.use("/ratings", supplierRatingRoutes); // REMOVED: Ratings table removed
+app.use("/ratings", supplierRatingRoutes);
 app.use("/purchase-orders", purchaseOrderRoutes);
 // app.use("/", supplierRoutes); // REMOVED: Suppliers managed via Asgardeo
 
