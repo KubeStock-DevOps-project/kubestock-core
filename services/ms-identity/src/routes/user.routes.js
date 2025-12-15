@@ -8,7 +8,7 @@ const userController = require("../controllers/user.controller");
 const { adminOnly } = require("../middleware/auth.middleware");
 
 // Supplier routes
-router.get("/suppliers", adminOnly, userController.listSuppliers);
+router.get("/suppliers", userController.listSuppliers);
 router.post("/suppliers", adminOnly, userController.createSupplier);
 
 // Warehouse staff routes
